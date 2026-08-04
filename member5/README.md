@@ -29,3 +29,13 @@ python3 member5/generate_submission.py
 
 This writes `submissions/Member5_Ensemble2_Prediction.csv` with the required
 `id,label` columns and all 6,999 test IDs in their original order.
+
+Run the separate XGBoost experiment and create its Kaggle submission with:
+
+```bash
+brew install libomp  # one-time macOS prerequisite for XGBoost
+.venv/bin/python member5/run_xgboost.py
+```
+
+This writes the validation comparison to `member5/results/xgboost_results.csv`
+and the final test predictions to `submissions/XGBoost_Prediction.csv`.
