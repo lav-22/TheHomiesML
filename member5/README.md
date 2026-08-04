@@ -48,3 +48,12 @@ python3 member5/run_rbf_svm.py
 
 This writes `member5/results/rbf_svm_results.csv` and the Kaggle-ready
 `submissions/TFIDF_RBF_SVM_Prediction.csv`.
+
+Generate the two feature-engineered Linear SVM submissions with:
+
+```bash
+python3 member5/run_feature_engineering.py
+```
+
+The two outputs are `submissions/Hybrid_Word_Char_TFIDF_Prediction.csv` and
+`submissions/Hybrid_TFIDF_Stylometry_Prediction.csv`.
