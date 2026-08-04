@@ -20,3 +20,12 @@ The script:
 6. Writes all result tables and validation predictions to `member5/results/`.
 
 The large course CSV files belong in `data/` and are ignored by Git.
+
+Generate the final Kaggle submission after selecting the ensemble:
+
+```bash
+python3 member5/generate_submission.py
+```
+
+This writes `submissions/Member5_Ensemble2_Prediction.csv` with the required
+`id,label` columns and all 6,999 test IDs in their original order.
