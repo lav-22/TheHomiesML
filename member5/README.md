@@ -39,3 +39,12 @@ brew install libomp  # one-time macOS prerequisite for XGBoost
 
 This writes the validation comparison to `member5/results/xgboost_results.csv`
 and the final test predictions to `submissions/XGBoost_Prediction.csv`.
+
+Run the TF-IDF weighted RBF-kernel SVM experiment with:
+
+```bash
+python3 member5/run_rbf_svm.py
+```
+
+This writes `member5/results/rbf_svm_results.csv` and the Kaggle-ready
+`submissions/TFIDF_RBF_SVM_Prediction.csv`.
