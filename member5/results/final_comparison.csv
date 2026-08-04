@@ -1,0 +1,10 @@
+model,validation_macro_f1,weights
+Ensemble 2,0.7641400877148306,"{""Linear SVM"": 0.6, ""Logistic Regression"": 0.2, ""Extra Trees"": 0.2}"
+Ensemble 1,0.7621690185508165,"{""Linear SVM"": 0.7, ""Logistic Regression"": 0.3}"
+Ensemble 2,0.7563690909945058,"{""Linear SVM"": 0.5, ""Logistic Regression"": 0.3, ""Extra Trees"": 0.2}"
+Ensemble 1,0.7556453854788234,"{""Linear SVM"": 0.6, ""Logistic Regression"": 0.4}"
+Linear SVM,0.7549834775042397,individual
+Ensemble 2,0.7503290440130963,"{""Linear SVM"": 0.3333333333333333, ""Logistic Regression"": 0.3333333333333333, ""Extra Trees"": 0.3333333333333333}"
+Ensemble 1,0.7496238787515145,"{""Linear SVM"": 0.5, ""Logistic Regression"": 0.5}"
+Logistic Regression,0.7352117359951704,individual
+Extra Trees,0.7188756726171565,individual
