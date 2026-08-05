@@ -16,7 +16,7 @@ from sklearn.svm import LinearSVC
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-RESULTS = ROOT / "member5" / "results"
+RESULTS = ROOT / "results"
 SUBMISSIONS = ROOT / "submissions"
 SEED = 42
 STYLE_WEIGHT = 0.05

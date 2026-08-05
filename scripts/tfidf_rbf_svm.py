@@ -11,7 +11,7 @@ from sklearn.svm import SVC
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-RESULTS = ROOT / "member5" / "results"
+RESULTS = ROOT / "results"
 SUBMISSION = ROOT / "submissions" / "TFIDF_RBF_SVM_Prediction.csv"
 SEED = 42
 

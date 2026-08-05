@@ -13,7 +13,7 @@ from sklearn.pipeline import FeatureUnion
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-RESULTS = ROOT / "member5" / "results"
+RESULTS = ROOT / "results"
 SUBMISSIONS = ROOT / "submissions"
 SEED = 42
 

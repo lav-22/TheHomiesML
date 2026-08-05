@@ -1,12 +1,12 @@
-# Member 5: Extra Trees and ensembles
+# Model experiments and submissions
 
-This folder contains only Member 5's work. It does not modify the notebooks or
-outputs produced by other team members.
+Runnable model code is stored in `scripts/`, experiment outputs in `results/`,
+and Kaggle-ready prediction files in `submissions/`.
 
 Run the complete validation experiment from the repository root:
 
 ```bash
-python member5/run_experiments.py
+python3 scripts/extra_trees_and_ensembles.py
 ```
 
 The script:
@@ -17,42 +17,42 @@ The script:
 4. Reproduces the completed Member 1 logistic-regression configuration and
    Member 4 Linear SVM configuration on the same split to obtain aligned scores.
 5. Tests two-model and three-model equal/weighted soft-voting ensembles.
-6. Writes all result tables and validation predictions to `member5/results/`.
+6. Writes all result tables and validation predictions to `results/`.
 
 The large course CSV files belong in `data/` and are ignored by Git.
 
 Generate the final Kaggle submission after selecting the ensemble:
 
 ```bash
-python3 member5/generate_submission.py
+python3 scripts/generate_ensemble2_submission.py
 ```
 
-This writes `submissions/Member5_Ensemble2_Prediction.csv` with the required
+This writes `submissions/Ensemble2_Prediction.csv` with the required
 `id,label` columns and all 6,999 test IDs in their original order.
 
 Run the separate XGBoost experiment and create its Kaggle submission with:
 
 ```bash
 brew install libomp  # one-time macOS prerequisite for XGBoost
-.venv/bin/python member5/run_xgboost.py
+.venv/bin/python scripts/xgboost_classifier.py
 ```
 
-This writes the validation comparison to `member5/results/xgboost_results.csv`
+This writes the validation comparison to `results/xgboost_results.csv`
 and the final test predictions to `submissions/XGBoost_Prediction.csv`.
 
 Run the TF-IDF weighted RBF-kernel SVM experiment with:
 
 ```bash
-python3 member5/run_rbf_svm.py
+python3 scripts/tfidf_rbf_svm.py
 ```
 
-This writes `member5/results/rbf_svm_results.csv` and the Kaggle-ready
+This writes `results/rbf_svm_results.csv` and the Kaggle-ready
 `submissions/TFIDF_RBF_SVM_Prediction.csv`.
 
 Generate the two feature-engineered Linear SVM submissions with:
 
 ```bash
-python3 member5/run_feature_engineering.py
+python3 scripts/hybrid_tfidf_linear_svm.py
 ```
 
 The two outputs are `submissions/Hybrid_Word_Char_TFIDF_Prediction.csv` and
@@ -61,7 +61,7 @@ The two outputs are `submissions/Hybrid_Word_Char_TFIDF_Prediction.csv` and
 Run the hybrid word/character TF-IDF SGD experiment with:
 
 ```bash
-python3 member5/run_hybrid_sgd.py
+python3 scripts/hybrid_tfidf_sgd.py
 ```
 
 It creates a standard prediction file and an optional rank-thresholded file
