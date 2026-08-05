@@ -75,3 +75,13 @@ python3 scripts/hybrid_tfidf_stylometry_sgd.py
 
 It creates standard and Rank55 submissions in `submissions/` and writes the
 validation comparison to `results/hybrid_stylometry_sgd_results.csv`.
+
+Run the advanced stylometry experiment with:
+
+```bash
+python3 scripts/advanced_stylometry_sgd.py
+```
+
+This adds sentence burstiness, vocabulary richness, function-word, repetition,
+punctuation, paragraph, readability and academic-format features to the hybrid
+TF-IDF SGD model. It creates standard and Rank55 Kaggle submissions.
