@@ -1,4 +1,8 @@
-"""Word/character TF-IDF plus advanced stylometry with averaged SGD."""
+"""From-scratch word/character TF-IDF, stylometry, and averaged SGD.
+
+The learning pipeline in this file deliberately does not use scikit-learn.
+NumPy and SciPy are used only for numerical arrays and sparse-matrix storage.
+"""
 
 from collections import Counter
 from pathlib import Path
@@ -9,11 +13,6 @@ import time
 import numpy as np
 import pandas as pd
 from scipy import sparse
-from sklearn.metrics import f1_score
-from sklearn.preprocessing import StandardScaler
-
-from hybrid_tfidf_linear_svm import build_vectorizer
-from hybrid_tfidf_sgd import make_model
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +35,229 @@ FUNCTION_WORD_GROUPS = {
         "consequently", "nevertheless", "overall", "thus", "hence",
     },
 }
+
+
+class ScratchStandardScaler:
+    """Column-wise standardization implemented with NumPy."""
+
+    def fit(self, values):
+        values = np.asarray(values, dtype=np.float64)
+        self.mean_ = values.mean(axis=0)
+        self.scale_ = values.std(axis=0)
+        self.scale_[self.scale_ == 0.0] = 1.0
+        return self
+
+    def transform(self, values):
+        values = np.asarray(values, dtype=np.float64)
+        return ((values - self.mean_) / self.scale_).astype(np.float32)
+
+    def fit_transform(self, values):
+        return self.fit(values).transform(values)
+
+
+class ScratchTfidfVectorizer:
+    """Small TF-IDF vectorizer supporting the settings used by this project."""
+
+    def __init__(self, analyzer, ngram_range, min_df=2, max_df=1.0,
+                 max_features=100_000):
+        self.analyzer = analyzer
+        self.ngram_range = ngram_range
+        self.min_df = min_df
+        self.max_df = max_df
+        self.max_features = max_features
+
+    @staticmethod
+    def _words(text):
+        return re.findall(r"(?u)\b\w\w+\b", str(text).lower())
+
+    def _terms(self, text):
+        text = "" if pd.isna(text) else str(text)
+        low, high = self.ngram_range
+        if self.analyzer == "word":
+            tokens = self._words(text)
+            for n in range(low, high + 1):
+                for index in range(len(tokens) - n + 1):
+                    yield " ".join(tokens[index:index + n])
+            return
+
+        # Like analyzer="char_wb": make character n-grams inside padded words.
+        for word in re.findall(r"\S+", text.lower()):
+            padded = f" {word} "
+            for n in range(low, high + 1):
+                for index in range(len(padded) - n + 1):
+                    yield padded[index:index + n]
+
+    def fit(self, texts):
+        documents = ["" if pd.isna(text) else str(text) for text in texts]
+        document_frequency = Counter()
+        term_frequency = Counter()
+        for text in documents:
+            terms = list(self._terms(text))
+            term_frequency.update(terms)
+            document_frequency.update(set(terms))
+
+        n_documents = len(documents)
+        maximum_df = (
+            int(self.max_df * n_documents) if isinstance(self.max_df, float)
+            else int(self.max_df)
+        )
+        candidates = [
+            term for term, count in document_frequency.items()
+            if count >= self.min_df and count <= maximum_df
+        ]
+        candidates.sort(key=lambda term: (-term_frequency[term], term))
+        candidates = candidates[:self.max_features]
+        self.vocabulary_ = {term: index for index, term in enumerate(candidates)}
+        self.idf_ = np.asarray([
+            math.log((1.0 + n_documents) / (1.0 + document_frequency[term])) + 1.0
+            for term in candidates
+        ], dtype=np.float32)
+        return self
+
+    def transform(self, texts):
+        texts = list(texts)
+        rows, columns, values = [], [], []
+        for row, text in enumerate(texts):
+            counts = Counter(
+                self.vocabulary_[term]
+                for term in self._terms(text)
+                if term in self.vocabulary_
+            )
+            if not counts:
+                continue
+            indices = np.fromiter(counts.keys(), dtype=np.int32)
+            data = 1.0 + np.log(np.fromiter(counts.values(), dtype=np.float32))
+            data *= self.idf_[indices]
+            norm = float(np.linalg.norm(data))
+            if norm:
+                data /= norm
+            rows.extend([row] * len(indices))
+            columns.extend(indices.tolist())
+            values.extend(data.tolist())
+        return sparse.csr_matrix(
+            (values, (rows, columns)),
+            shape=(len(texts), len(self.vocabulary_)),
+            dtype=np.float32,
+        )
+
+    def fit_transform(self, texts):
+        texts = list(texts)
+        return self.fit(texts).transform(texts)
+
+
+class ScratchHybridTfidf:
+    """Union of independently normalized word and character TF-IDF."""
+
+    def __init__(self):
+        self.word = ScratchTfidfVectorizer("word", (1, 2), 2, 0.98, 100_000)
+        self.character = ScratchTfidfVectorizer("char_wb", (3, 5), 2, 1.0, 100_000)
+
+    def fit_transform(self, texts):
+        texts = list(texts)
+        return sparse.hstack(
+            [self.word.fit_transform(texts), self.character.fit_transform(texts)],
+            format="csr",
+        )
+
+    def transform(self, texts):
+        texts = list(texts)
+        return sparse.hstack(
+            [self.word.transform(texts), self.character.transform(texts)],
+            format="csr",
+        )
+
+
+class ScratchAveragedHingeSGD:
+    """Mini-batch SGD for a balanced, L2-regularized linear SVM."""
+
+    def __init__(self, alpha=1e-4, epochs=100, batch_size=256,
+                 learning_rate=20.0, random_state=42, tolerance=1e-5):
+        self.alpha = alpha
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.random_state = random_state
+        self.tolerance = tolerance
+
+    def fit(self, features, labels):
+        features = sparse.csr_matrix(features, dtype=np.float32)
+        labels = np.asarray(labels, dtype=np.int8)
+        signed = np.where(labels == 1, 1.0, -1.0).astype(np.float32)
+        counts = np.bincount(labels, minlength=2)
+        class_weights = len(labels) / (2.0 * np.maximum(counts, 1))
+        sample_weights = class_weights[labels].astype(np.float32)
+        weights = np.zeros(features.shape[1], dtype=np.float32)
+        bias = 0.0
+        averaged_weights = np.zeros_like(weights)
+        averaged_bias = 0.0
+        rng = np.random.default_rng(self.random_state)
+        previous_loss = np.inf
+        averaged_epochs = 0
+        update = 0
+
+        for _epoch in range(self.epochs):
+            order = rng.permutation(len(labels))
+            epoch_hinge = 0.0
+            for start in range(0, len(labels), self.batch_size):
+                indices = order[start:start + self.batch_size]
+                batch = features[indices]
+                targets = signed[indices]
+                importance = sample_weights[indices]
+                margins = targets * (batch.dot(weights) + bias)
+                active = margins < 1.0
+                rate = self.learning_rate / math.sqrt(1.0 + update)
+                weights *= max(0.0, 1.0 - rate * self.alpha)
+                if np.any(active):
+                    active_x = batch[active]
+                    coefficients = importance[active] * targets[active]
+                    gradient = np.asarray(active_x.T.dot(coefficients)).ravel()
+                    weights += (rate / len(indices)) * gradient
+                    bias += rate * float(coefficients.sum() / len(indices))
+                epoch_hinge += float(np.maximum(0.0, 1.0 - margins).sum())
+                update += 1
+
+            averaged_weights += weights
+            averaged_bias += bias
+            averaged_epochs += 1
+            loss = epoch_hinge / len(labels)
+            if abs(previous_loss - loss) < self.tolerance:
+                break
+            previous_loss = loss
+
+        self.coef_ = averaged_weights / averaged_epochs
+        self.intercept_ = averaged_bias / averaged_epochs
+        self.n_iter_ = averaged_epochs
+        return self
+
+    def decision_function(self, features):
+        return np.asarray(features.dot(self.coef_) + self.intercept_).ravel()
+
+    def predict(self, features):
+        return (self.decision_function(features) >= 0.0).astype(int)
+
+
+def build_vectorizer():
+    return ScratchHybridTfidf()
+
+
+def make_model(loss="hinge", alpha=1e-4):
+    if loss != "hinge":
+        raise ValueError("The from-scratch model currently supports hinge loss only.")
+    return ScratchAveragedHingeSGD(alpha=alpha)
+
+
+def macro_f1_score(y_true, y_pred):
+    """Binary unweighted Macro F1 implemented from the definition."""
+    y_true = np.asarray(y_true, dtype=int)
+    y_pred = np.asarray(y_pred, dtype=int)
+    class_scores = []
+    for label in (0, 1):
+        true_positive = np.sum((y_true == label) & (y_pred == label))
+        false_positive = np.sum((y_true != label) & (y_pred == label))
+        false_negative = np.sum((y_true == label) & (y_pred != label))
+        denominator = 2 * true_positive + false_positive + false_negative
+        class_scores.append(0.0 if denominator == 0 else 2 * true_positive / denominator)
+    return float(np.mean(class_scores))
 
 
 def safe_stats(values):
@@ -189,7 +411,7 @@ def main():
     vectorizer = build_vectorizer()
     train_tfidf = vectorizer.fit_transform(train_text)
     val_tfidf = vectorizer.transform(val_text)
-    scaler = StandardScaler()
+    scaler = ScratchStandardScaler()
     train_styles = scaler.fit_transform(style_matrix(train_text))
     val_styles = scaler.transform(style_matrix(val_text))
 
@@ -200,7 +422,7 @@ def main():
         start = time.perf_counter()
         model = make_model("hinge", 1e-4)
         model.fit(x_train, y_train)
-        score = f1_score(y_val, model.predict(x_val), average="macro", zero_division=0)
+        score = macro_f1_score(y_val, model.predict(x_val))
         rows.append({
             "loss": "hinge", "alpha": 1e-4, "style_weight": weight,
             "validation_macro_f1": float(score),
@@ -215,7 +437,7 @@ def main():
     final_vectorizer = build_vectorizer()
     all_tfidf = final_vectorizer.fit_transform(train["text"])
     test_tfidf = final_vectorizer.transform(test["text"])
-    final_scaler = StandardScaler()
+    final_scaler = ScratchStandardScaler()
     all_styles = final_scaler.fit_transform(style_matrix(train["text"]))
     test_styles = final_scaler.transform(style_matrix(test["text"]))
     x_all = combine(all_tfidf, all_styles, best_weight)

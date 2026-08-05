@@ -1,16 +1,19 @@
-"""Tune advanced-stylometry weight and SGD decision threshold."""
+"""Tune the fully from-scratch advanced-stylometry SGD pipeline."""
 
 from pathlib import Path
 import time
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import f1_score
-from sklearn.preprocessing import StandardScaler
-
-from advanced_stylometry_sgd import combine, save_submission, style_matrix
-from hybrid_tfidf_linear_svm import build_vectorizer
-from hybrid_tfidf_sgd import make_model
+from advanced_stylometry_sgd import (
+    ScratchStandardScaler,
+    build_vectorizer,
+    combine,
+    macro_f1_score,
+    make_model,
+    save_submission,
+    style_matrix,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +24,7 @@ MINIMUM_F1 = 0.85
 
 def macro_f1(y_true, scores, threshold):
     predictions = np.asarray(scores >= threshold, dtype=int)
-    return float(f1_score(y_true, predictions, average="macro", zero_division=0))
+    return macro_f1_score(y_true, predictions)
 
 
 def tune_threshold(y_true, scores):
@@ -50,7 +53,7 @@ def main():
     vectorizer = build_vectorizer()
     train_tfidf = vectorizer.fit_transform(train_text)
     val_tfidf = vectorizer.transform(val_text)
-    scaler = StandardScaler()
+    scaler = ScratchStandardScaler()
     train_styles = scaler.fit_transform(style_matrix(train_text))
     val_styles = scaler.transform(style_matrix(val_text))
 
@@ -98,7 +101,7 @@ def main():
     final_vectorizer = build_vectorizer()
     all_tfidf = final_vectorizer.fit_transform(train["text"])
     test_tfidf = final_vectorizer.transform(test["text"])
-    final_scaler = StandardScaler()
+    final_scaler = ScratchStandardScaler()
     all_styles = final_scaler.fit_transform(style_matrix(train["text"]))
     test_styles = final_scaler.transform(style_matrix(test["text"]))
     x_all = combine(all_tfidf, all_styles, float(best["style_weight"]))
