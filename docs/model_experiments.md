@@ -85,3 +85,12 @@ python3 scripts/advanced_stylometry_sgd.py
 This adds sentence burstiness, vocabulary richness, function-word, repetition,
 punctuation, paragraph, readability and academic-format features to the hybrid
 TF-IDF SGD model. It creates standard and Rank55 Kaggle submissions.
+
+Tune the advanced stylometry weight and validation decision threshold with:
+
+```bash
+python3 scripts/tune_advanced_stylometry_sgd.py
+```
+
+New submissions are generated only when tuned validation Macro F1 exceeds
+`0.85`. Results are written to `results/advanced_stylometry_threshold_results.csv`.
