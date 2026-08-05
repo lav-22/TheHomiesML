@@ -66,3 +66,12 @@ python3 scripts/hybrid_tfidf_sgd.py
 
 It creates a standard prediction file and an optional rank-thresholded file
 whose class-1 rate is 55%, matching the strongest existing Kaggle SGD model.
+
+Run the hybrid TF-IDF, stylometry and SGD experiment with:
+
+```bash
+python3 scripts/hybrid_tfidf_stylometry_sgd.py
+```
+
+It creates standard and Rank55 submissions in `submissions/` and writes the
+validation comparison to `results/hybrid_stylometry_sgd_results.csv`.
