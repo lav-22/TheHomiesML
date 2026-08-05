@@ -57,3 +57,12 @@ python3 member5/run_feature_engineering.py
 
 The two outputs are `submissions/Hybrid_Word_Char_TFIDF_Prediction.csv` and
 `submissions/Hybrid_TFIDF_Stylometry_Prediction.csv`.
+
+Run the hybrid word/character TF-IDF SGD experiment with:
+
+```bash
+python3 member5/run_hybrid_sgd.py
+```
+
+It creates a standard prediction file and an optional rank-thresholded file
+whose class-1 rate is 55%, matching the strongest existing Kaggle SGD model.
