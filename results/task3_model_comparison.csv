@@ -1,0 +1,7 @@
+model,family,settings,val_macro_f1,pred_class1_rate,fit_seconds,best_threshold,val_macro_f1_tuned
+Extra Trees,library ensemble,"n_estimators=500, max_features=sqrt",0.7188756726171565,0.7765,69.1,0.574,0.7597852799967285
+Soft vote (3 models),ensemble,Linear SVM by SGD + Extra Trees + Multinomial Naive Bayes,0.7270614919434673,0.491,0.1,0.4043044094356922,0.7462042953533619
+Linear SVM by SGD,from scratch,"loss=modified_huber, alpha=0.0001, balanced",0.7445618537429517,0.5695,8.6,-0.01547413365382458,0.7460517805117448
+Logistic Regression,from scratch (Task 1),"lr=0.5, l2=1e-5, 300 epochs",0.722654648176881,0.733,19.2,0.6274662224224309,0.7439638198170828
+Multinomial Naive Bayes,from scratch,alpha=0.001,0.6741135515041119,0.7235,0.0,0.5328745014252076,0.6818640534887492
+Complement Naive Bayes,from scratch,alpha=2.0,0.6668862070168453,0.59125,0.0,-1.1042186737813189e-06,0.6740109800001457
