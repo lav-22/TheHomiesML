@@ -316,8 +316,8 @@ set completely. Capping `max_depth` reduced that gap but made validation much
 the ensemble average, not any single tree, that generalises.
 
 Extra Trees is also where the decision threshold pays most (+0.047, versus
-+0.002 for the linear SVM), because averaged tree votes are poorly calibrated
-probabilities and 0.5 is far from the best operating point.
++0.002 for the linear classifier), because averaged tree votes are poorly
+calibrated probabilities and 0.5 is far from the best operating point.
 
 **Soft-vote ensemble.** The three models' scores live on different scales (a
 probability, a signed margin, a log-probability), so we converted each to a rank
@@ -435,12 +435,23 @@ models side by side. We fixed this by agreeing one shared validation split,
 verifying the independently derived splits matched row-for-row, and consolidating
 everything into one notebook with a single comparison table.
 
+**A settled decision that quietly went stale.** We compared three losses on the
+provided features, picked modified Huber, and moved on. When we later built the
+hybrid TF-IDF + stylometry pipeline we wrote it with hinge loss and never
+re-ran that comparison — the choice felt already made. Re-testing it at the end
+was worth about +0.02 Macro F1, more than every other Task 3 tuning decision
+combined. What we take from this is that a hyperparameter is only validated
+*against the features it was tuned on*; changing the representation invalidates
+the tuning done on the old one. We now re-run the cheap comparisons whenever the
+input changes.
+
 **Knowing when to stop.** We had a submission that forced the test-set class-1
 rate to 55% by thresholding on a quantile of the *test* scores. It scored well on
 validation-by-proxy, but it is fitting to the test distribution rather than
 learning from the data, and it would be a poor bet on the private leaderboard.
-We removed it. Related: we chose the coarse threshold grid deliberately, since a
-finer one just fits noise in a single 4,000-row split.
+We removed it. In the same spirit we kept the threshold grid coarse, and set a
+rule that a tuned threshold is only adopted when it beats the default by more
+than 0.005 — for the final model it does not, so we ship the plain cut-off.
 
 ### 5.2 Limitations
 
@@ -453,9 +464,10 @@ finer one just fits noise in a single 4,000-row split.
    would let us distinguish real gains from noise; we skipped it because the
    from-scratch pipeline takes a couple of minutes per fit and we chose to spend
    that budget on features instead. This is the change we would make first.
-3. **Threshold tuned on the same split used for selection.** The gain is small
-   (+0.002 for the final model) so the risk is contained, but a nested split
-   would be cleaner.
+3. **Hyperparameters selected on the same split used to report scores.** We
+   mitigated this by keeping grids coarse and by declining the tuned threshold
+   for the final model, but a nested split would be cleaner and is the honest
+   fix.
 4. **Stylometry is English-specific and partly hand-tuned.** The readability
    formulas, function-word lists and syllable heuristic assume English prose and
    would not transfer to another language.

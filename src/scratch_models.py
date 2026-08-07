@@ -53,6 +53,9 @@ def train(X, y, bs, epochs, lr, l2=0.0, class_weight=None, shuffle=True,
         class_weight "balanced" to reweight the classes to equal total mass
         shuffle      reshuffle the row order before every epoch
     """
+    # A pandas Series would index by label rather than position below, so the
+    # batch lookups have to be done on a plain array
+    y = np.asarray(y, dtype=np.float64)
     m, n = X.shape
     w = np.zeros(n)
     b = 0.0
@@ -221,6 +224,9 @@ def sgd_fit(X, y, loss="hinge", penalty="l2", alpha=0.0001, l1_ratio=0.15,
     after every epoch, which is what the convergence plot uses.
     """
     rng = np.random.default_rng(random_state)
+    # A pandas Series would index by label rather than position below, so the
+    # batch lookups have to be done on a plain array
+    y = np.asarray(y)
     m, n = X.shape
     w = np.zeros(n)
     b = 0.0

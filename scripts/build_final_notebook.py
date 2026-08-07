@@ -889,7 +889,7 @@ of the features.
 code("""
 train_text = train_raw.loc[is_train, "text"]
 val_text = train_raw.loc[~is_train, "text"]
-y_train_text = train_raw.loc[is_train, LABEL_COLUMN]
+y_train_text = train_raw.loc[is_train, LABEL_COLUMN].to_numpy()
 y_val_text = train_raw.loc[~is_train, LABEL_COLUMN].to_numpy()
 
 t0 = time.time()
