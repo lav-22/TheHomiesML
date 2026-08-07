@@ -1,0 +1,9 @@
+task,model,features,implementation,val_macro_f1,val_macro_f1_tuned
+3,Hybrid TF-IDF + stylometry + SGD (modified Huber),our own,from scratch,0.8490549819848693,0.8497904045297762
+3,Linear classifier by SGD,provided 5000 TF-IDF,from scratch,0.7445618537429517,
+3,Soft vote (linear + Extra Trees + NB),provided 5000 TF-IDF,ensemble,0.7270614919434673,0.7462042953533619
+1,Logistic Regression,provided 5000 TF-IDF,from scratch,0.722654648176881,0.7439638198170828
+3,Extra Trees,provided 5000 TF-IDF,sklearn ensemble (permitted),0.7188756726171565,0.7597852799967285
+3,Multinomial Naive Bayes,provided 5000 TF-IDF,from scratch,0.6741135515041119,
+3,Complement Naive Bayes,provided 5000 TF-IDF,from scratch,0.6668862070168453,
+2,PCA(100) + KNN k=2,provided 5000 TF-IDF,sklearn (permitted),0.6556396794583539,

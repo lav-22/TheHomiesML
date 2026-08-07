@@ -347,16 +347,18 @@ modified Huber clearly beat hinge on the provided features. We then built the
 hybrid pipeline using an averaged **hinge**-loss SGD and never re-tested that
 choice against the new features. When we finally did:
 
-| Loss (hybrid features, lr=0.5, 60 epochs) | Val Macro F1 |
+| Loss (hybrid features, lr=0.5, α=1e-5, 60 epochs) | Val Macro F1 |
 |---|---|
-| hinge | 0.8104 |
-| log loss | 0.7824 |
+| hinge | 0.8272 |
+| log loss | 0.8068 |
 | **modified Huber** | **0.8491** |
-| *(previous final model: averaged hinge SGD)* | *0.8289* |
+| *(previous final model: averaged hinge SGD, α=1e-4)* | *0.8289* |
 
-That single change was worth about **+0.020** — more than every other Task 3
-tuning decision combined. The lesson is general: a hyperparameter validated on
-one representation does not automatically carry to another.
+That single change was worth **+0.022** over hinge on identical settings, and
++0.020 over the averaged-hinge model we had been treating as final — more than
+every other Task 3 tuning decision combined. The lesson is general: a
+hyperparameter validated on one representation does not automatically carry to
+another.
 
 **Style weight and training length.** With modified Huber fixed:
 
