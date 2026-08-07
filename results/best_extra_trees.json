@@ -1,6 +1,0 @@
-{
-  "n_estimators": 500,
-  "max_depth": null,
-  "max_features": "sqrt",
-  "class_weight": null
-}

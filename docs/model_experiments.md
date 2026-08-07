@@ -32,11 +32,13 @@ Running it regenerates every submission file.
 
 | Script | What it does | Output |
 |---|---|---|
-| `task1_logreg_tuning.py` | Task 1 tuning grid: shuffling, L2, class weight, threshold | `results/logreg_improved_results.csv` |
+| `task1_logreg_tuning.py` | Task 1 tuning grid: shuffling, L2, class weight, threshold | `results/logreg_tuning_results.csv` |
 | `task2_pca_knn.py` | Task 2 PCA + KNN at 2000/1000/500/100 components, plus the variance and tie-break analysis | `results/pca_knn_*.csv`, 4 submissions |
 | `task3_model_comparison.py` | Every Task 3 model on the provided 5000 features, one table | `results/task3_model_comparison.csv` |
 | `task3_extra_trees_tuning.py` | One-factor-at-a-time Extra Trees tuning | `results/task3_extra_trees_tuning.csv` |
-| `task3_final_model.py` | The final model: hybrid TF-IDF + stylometry, style weight and threshold tuned on validation | `submissions/Final_Prediction.csv` |
+| `task3_loss_on_hybrid.py` | Re-tests the loss function on our own features, where the choice made on the provided features no longer held | `results/task3_loss_on_hybrid.csv` |
+| `task3_final_model.py` | The final model: hybrid TF-IDF + stylometry, style weight and epochs tuned on validation | `submissions/Final_Prediction.csv` |
+| `verify_submissions.py` | Format-checks every file in `submissions/` | — |
 | `xgboost_classifier.py` | XGBoost experiment (needs `xgboost`, not installed in the final environment) | `results/xgboost_results.csv` |
 
 Run everything from the repository root.

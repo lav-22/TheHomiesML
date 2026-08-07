@@ -257,9 +257,9 @@ comparison isolates the model.
 
 | Model | Implementation | Best setting | Val Macro F1 | Tuned |
 |---|---|---|---|---|
-| Linear SVM by SGD | from scratch | modified Huber, α=1e-4, balanced | **0.7446** | 0.7461 |
+| Linear classifier by SGD | from scratch | modified Huber, α=1e-4, balanced | **0.7446** | 0.7461 |
 | Extra Trees | sklearn (ensemble — permitted) | 800 trees, max_features=sqrt | 0.7152 | **0.7621** |
-| Soft vote (SVM + Extra Trees + NB) | ensemble | rank-averaged | 0.7271 | 0.7462 |
+| Soft vote (linear + Extra Trees + NB) | ensemble | rank-averaged | 0.7271 | 0.7462 |
 | Logistic Regression | from scratch (Task 1) | lr=0.5, L2=1e-5 | 0.7227 | 0.7440 |
 | XGBoost | library (ensemble — permitted) | 300 trees, depth 6, lr=0.1 | 0.7273 | — |
 | Multinomial Naive Bayes | from scratch | α=0.001 | 0.6741 | 0.6819 |
@@ -329,40 +329,67 @@ clear one.
 
 ### 4.4 Task 3 — changing the features instead
 
-Same from-scratch linear SVM, our own features from Section 3.2:
+Same from-scratch trainer, our own features from Section 3.2:
 
 | Features | Val Macro F1 |
 |---|---|
 | Provided 5000 TF-IDF | 0.7446 |
-| Word + char TF-IDF (~200k) + 78 stylometry | **0.8305** |
+| Word + char TF-IDF (~200k) + 78 stylometry | **0.8491** |
 
 **This is the finding of the project.** Swapping the input lifted the *same*
-model by about 0.086 — far more than any model change, hyperparameter, or
+model by about 0.105 — far more than any model change, hyperparameter, or
 ensemble achieved. The model was never the bottleneck; the representation was.
 
 ### 4.5 Tuning the final model
 
-| `style_weight` | Val Macro F1 | Best threshold | Tuned |
+**The question we nearly forgot to re-ask.** Section 4.3 established that
+modified Huber clearly beat hinge on the provided features. We then built the
+hybrid pipeline using an averaged **hinge**-loss SGD and never re-tested that
+choice against the new features. When we finally did:
+
+| Loss (hybrid features, lr=0.5, 60 epochs) | Val Macro F1 |
+|---|---|
+| hinge | 0.8104 |
+| log loss | 0.7824 |
+| **modified Huber** | **0.8491** |
+| *(previous final model: averaged hinge SGD)* | *0.8289* |
+
+That single change was worth about **+0.020** — more than every other Task 3
+tuning decision combined. The lesson is general: a hyperparameter validated on
+one representation does not automatically carry to another.
+
+**Style weight and training length.** With modified Huber fixed:
+
+| `style_weight` | Epochs | Val Macro F1 | With tuned threshold |
 |---|---|---|---|
-| 0.02 | 0.8119 | — | — |
-| 0.05 | 0.8305 | −0.0375 | 0.8303 |
-| 0.10 | 0.8289 | −0.0625 | **0.8307** |
-| 0.15 | 0.8262 | −0.0500 | 0.8274 |
+| 0.10 | 60 | **0.8491** | 0.8498 |
+| 0.05 | 100 | 0.8484 | 0.8481 |
+| 0.10 | 100 | 0.8477 | 0.8503 |
+| 0.05 | 60 | 0.8421 | 0.8431 |
+| 0.10 | 30 | 0.8420 | 0.8431 |
+| 0.05 | 30 | 0.8374 | 0.8367 |
 
-The weight matters between 0.02 and 0.05 and then flattens — once the stylometry
-block is audible at all, its exact volume is not critical. Threshold tuning was
-worth almost nothing here (+0.002), unlike for Extra Trees.
+We checked that 60 epochs is a plateau rather than the edge of the grid by
+extending to 200 (0.8491 / 0.8477 / 0.8485 / 0.8487 at 60 / 100 / 150 / 200) —
+flat within 0.002, so we took the cheapest point on the plateau.
 
-We also tried **averaging three random seeds**. It gave no improvement at all
-(0.8293 vs 0.8305 single-seed), because the optimiser already averages its
-weights across epochs, so there was little seed variance left to average away.
-We dropped it rather than pay three times the compute for noise.
+**On the threshold.** Tuning it gains only +0.0007 here, against +0.047 for
+Extra Trees. We therefore **do not** apply it: our selection rule adopts a tuned
+threshold only when it beats the default by more than 0.005, on the grounds that
+a cut-off fitted to 4,000 validation rows is as likely to be noise as signal.
+The margin-based losses already put their natural cut-off at 0.
 
-**Final model:** hybrid word+char TF-IDF + 78 stylometry features
-(`style_weight=0.10`), averaged hinge-loss SGD (α=1e-4, 100 epochs, batch 256,
-balanced class weights, learning rate 20/√(1+t)), threshold −0.0625.
-Validation Macro F1 **0.8307**. Refitted on all 20,000 labelled rows →
-`submissions/Final_Prediction.csv` (class-1 rate 0.6805).
+**What did not work.** Averaging three random seeds gave no improvement
+(0.8293 vs 0.8305 on the earlier hinge pipeline), because the optimiser already
+averages its weights across epochs, so there was little seed variance left to
+remove. We dropped it rather than pay three times the compute for noise.
+
+**Final model:** hybrid word + character TF-IDF + 78 stylometry features
+(`style_weight=0.10`), linear classifier trained by mini-batch SGD with modified
+Huber loss (lr=0.5, α=1e-5, 60 epochs, batch 256, balanced class weights, L2
+penalty), decision threshold 0. Validation Macro F1 **0.8491**. Refitted on all
+20,000 labelled rows → `submissions/Final_Prediction.csv` (class-1 rate 0.5954,
+against a training rate of 0.6252).
 
 ### 4.6 Kaggle public leaderboard scores
 
@@ -376,7 +403,7 @@ Validation Macro F1 **0.8307**. Refitted on all 20,000 labelled rows →
 | Task 2 — PCA 1000 + KNN | `PCA1000_KNN_Prediction.csv` | 0.4753 | *TBC* |
 | Task 2 — PCA 500 + KNN | `PCA500_KNN_Prediction.csv` | 0.5603 | *TBC* |
 | Task 2 — PCA 100 + KNN | `PCA100_KNN_Prediction.csv` | 0.6556 | *TBC* |
-| Task 3 — final model | `Final_Prediction.csv` | 0.8307 | *TBC* |
+| Task 3 — final model | `Final_Prediction.csv` | 0.8491 | *TBC* |
 
 ---
 
@@ -445,22 +472,25 @@ selection over the 200,000 TF-IDF columns, which are certainly redundant.
 
 ## 6. Conclusion
 
-We built a GenAI content detector reaching **0.8307** Macro F1 on our held-out
-validation split, using a linear SVM trained by averaged mini-batch SGD on a
-combination of word-level TF-IDF, character-level TF-IDF, and 78 hand-built
-stylometry features — all implemented from scratch with NumPy.
+We built a GenAI content detector reaching **0.8491** Macro F1 on our held-out
+validation split: a linear classifier trained by mini-batch SGD with modified
+Huber loss, on a combination of word-level TF-IDF, character-level TF-IDF, and
+78 hand-built stylometry features — all implemented from scratch with NumPy.
 
 The single most useful thing we learned is that **the representation mattered far
 more than the model**. Six different algorithms on the provided 5000 TF-IDF
 features all landed between 0.67 and 0.76, a spread of under 0.09 across model
 families as different as Naive Bayes and random forests. Changing the *features*
-and keeping the model fixed moved us from 0.7446 to 0.8305 on its own. Time spent
+and keeping the model fixed moved us from 0.7446 to 0.8491 on its own. Time spent
 looking at the data was worth more than time spent tuning.
 
-Two smaller findings we did not expect: dimension reduction helped KNN *more*
-the more variance it threw away, and the decision threshold — an afterthought in
-most of our first drafts — was worth more than most hyperparameters, because
-Macro F1 on imbalanced classes is simply not maximised at the default cut-off.
+Three smaller findings we did not expect. Dimension reduction helped KNN *more*
+the more variance it threw away. The decision threshold — an afterthought in most
+of our first drafts — was worth more than most hyperparameters for the tree
+ensemble, though almost nothing for the final margin-based model. And a
+hyperparameter we had settled early (the loss function) turned out to be wrong
+once the features changed underneath it, which cost us 0.02 Macro F1 until we
+thought to re-test it.
 
 ---
 
@@ -518,7 +548,9 @@ python3 scripts/task1_logreg_tuning.py        # Task 1 tuning grid
 python3 scripts/task2_pca_knn.py              # Task 2 PCA + KNN, 4 submissions
 python3 scripts/task3_model_comparison.py     # Task 3 all models, one table
 python3 scripts/task3_extra_trees_tuning.py   # Task 3 Extra Trees tuning
+python3 scripts/task3_loss_on_hybrid.py       # Task 3 loss re-test on our features
 python3 scripts/task3_final_model.py          # Task 3 final model + submission
+python3 scripts/verify_submissions.py         # format-check every submission
 ```
 
 `random_state=42` throughout. `data/train.csv` and `data/test.csv` are

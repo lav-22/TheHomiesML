@@ -125,7 +125,7 @@ for lr in [0.5, 2.0]:
 results_df = (pd.DataFrame(results)
               .sort_values("val_macro_f1_tuned", ascending=False)
               .reset_index(drop=True))
-results_df.to_csv(RESULTS_DIR / "logreg_improved_results.csv", index=False)
+results_df.to_csv(RESULTS_DIR / "logreg_tuning_results.csv", index=False)
 
 print("\nTop configurations by tuned validation Macro F1:")
 print(results_df.head(10).to_string(index=False))

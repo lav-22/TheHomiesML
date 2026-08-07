@@ -21,17 +21,22 @@ Macro F1 on the shared validation split (`data/splits/shared_validation_split.cs
 
 | Task | Model | Val Macro F1 |
 |---|---|---|
-| 3 | **Hybrid TF-IDF + stylometry + linear SVM (from scratch)** | **0.8307** |
+| 3 | **Hybrid TF-IDF + stylometry + SGD, modified Huber (from scratch)** | **0.8491** |
 | 3 | Extra Trees (tuned threshold) | 0.7621 |
-| 3 | Linear SVM by SGD (from scratch) | 0.7446 |
+| 3 | Linear classifier by SGD (from scratch) | 0.7446 |
 | 1 | Logistic Regression (from scratch) | 0.7440 |
 | 3 | Multinomial Naive Bayes (from scratch) | 0.6741 |
 | 3 | Complement Naive Bayes (from scratch) | 0.6669 |
 | 2 | PCA(100) + KNN (k=2) | 0.6556 |
 
-The headline finding: swapping the provided 5000 TF-IDF features for our own
-word + character TF-IDF and 78 stylometry features lifted the *same* model from
-0.7446 to 0.8305. The representation mattered far more than the algorithm.
+Two headline findings:
+
+- Swapping the provided 5000 TF-IDF features for our own word + character TF-IDF
+  and 78 stylometry features lifted the *same* model from 0.7446 to 0.8491. The
+  representation mattered far more than the algorithm.
+- We had settled on modified Huber loss early, then built the hybrid pipeline
+  with hinge loss and never re-tested. Re-testing was worth a further +0.02 —
+  a hyperparameter validated on one representation does not carry to another.
 
 ## Setup
 

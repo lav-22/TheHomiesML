@@ -96,7 +96,7 @@ This notebook contains our code for Tasks 1 to 3.
 | 0 | Setup and dataset understanding | — |
 | 1 | Logistic Regression **from scratch** | Logistic Regression |
 | 2 | PCA + KNN (`n_neighbors=2`) | KNN on 2000 / 1000 / 500 / 100 components |
-| 3 | Other models, race to the top | Naive Bayes, Complement NB, Linear SVM by SGD, Extra Trees, soft vote, hybrid TF-IDF + stylometry |
+| 3 | Other models, race to the top | Naive Bayes, Complement NB, linear classifier by SGD, Extra Trees, soft vote, hybrid TF-IDF + stylometry |
 
 **On the "from scratch" rule.** Task 1 and Task 3 models are written out in
 this notebook using NumPy only — no sklearn estimator is used to learn
@@ -868,19 +868,6 @@ code("from collections import Counter\nimport math\nimport re\n\nfrom scipy impo
      + text_feature_block("class ScratchStandardScaler:", "class ScratchAveragedHingeSGD:"))
 
 md("""
-#### The linear SVM, written from scratch
-
-Mini-batch SGD on the hinge loss with an L2 penalty. Two details matter: the
-learning rate decays as $\\eta_0/\\sqrt{1+t}$ so later updates settle rather than
-bounce, and the weights are **averaged across epochs**, which is a standard way
-to stabilise SGD without extra passes over the data. Class weights are applied
-per sample so the 62.5 / 37.5 split does not bias the margin.
-""")
-
-code(text_feature_block("class ScratchAveragedHingeSGD:", "def build_vectorizer():")
-     + "\n\n\n" + text_feature_block("def combine(tfidf, styles, weight):"))
-
-md("""
 #### The 78 stylometry features
 
 Measures of *how* a text is written: burstiness of sentence length, vocabulary
@@ -890,7 +877,14 @@ scores.
 """)
 
 code(text_feature_block("FUNCTION_WORD_GROUPS = {", "class ScratchStandardScaler:")
-     + "\n\n\n" + text_feature_block("def safe_stats(values):", "def combine(tfidf, styles, weight):"))
+     + "\n\n\n" + text_feature_block("def safe_stats(values):", "def combine(tfidf, styles, weight):")
+     + "\n\n\n" + text_feature_block("def combine(tfidf, styles, weight):"))
+
+md("""
+The classifier is the **same `sgd_fit` from Section 3.3** — nothing about the
+model changes here, only its input. That is deliberate: it isolates the effect
+of the features.
+""")
 
 code("""
 train_text = train_raw.loc[is_train, "text"]
@@ -912,49 +906,81 @@ print(f"TF-IDF block: {train_tfidf.shape}, stylometry block: {train_styles.shape
 """)
 
 md("""
-### Tuning the stylometry weight
+### Which loss? The question we nearly forgot to re-ask
 
-The 78 stylometry columns sit next to 200000 TF-IDF columns, so without a
-weight they are simply drowned out. `style_weight` scales that block.
+Section 3.3 found modified Huber clearly best on the provided features. When we
+first built this pipeline we used hinge loss and never re-tested that choice on
+the new features — an easy thing to miss, and it turned out to cost about 0.02
+Macro F1. The lesson: a hyperparameter chosen on one representation does not
+automatically carry to another.
+""")
+
+code("""
+x_train_hybrid = combine(train_tfidf, train_styles, 0.10)
+x_val_hybrid = combine(val_tfidf, val_styles, 0.10)
+
+loss_rows = []
+for loss_name in ["hinge", "modified_huber", "log_loss"]:
+    t0 = time.time()
+    w_h, b_h, _, _ = sgd_fit(x_train_hybrid, y_train_text, loss=loss_name,
+                             penalty="l2", alpha=1e-5, class_weight="balanced",
+                             lr=0.5, epochs=60, bs=256, random_state=RANDOM_SEED)
+    score = calculate_macro_f1(y_val_text, sgd_predict(x_val_hybrid, w_h, b_h))
+    loss_rows.append({"loss": loss_name, "val_macro_f1": score,
+                      "fit_seconds": round(time.time() - t0, 1)})
+    print(f"loss={loss_name:<16} F1={score:.4f}")
+
+pd.DataFrame(loss_rows).to_csv(RESULTS_DIR / "task3_loss_on_hybrid.csv", index=False)
+pd.DataFrame(loss_rows)
+""")
+
+md("""
+### Tuning the stylometry weight and the training length
+
+`style_weight` scales the 78 stylometry columns against the ~200,000 TF-IDF
+columns — without it they are simply drowned out.
 """)
 
 code("""
 style_rows = []
-for weight in [0.02, 0.05, 0.10, 0.15]:
+for weight in [0.05, 0.10]:
     x_tr = combine(train_tfidf, train_styles, weight)
     x_va = combine(val_tfidf, val_styles, weight)
 
-    t0 = time.time()
-    model = ScratchAveragedHingeSGD(alpha=1e-4, random_state=RANDOM_SEED)
-    model.fit(x_tr, y_train_text)
-    scores = model.decision_function(x_va)
+    for epochs in [30, 60, 100]:
+        t0 = time.time()
+        w_s, b_s, _, _ = sgd_fit(x_tr, y_train_text, loss="modified_huber",
+                                 penalty="l2", alpha=1e-5, class_weight="balanced",
+                                 lr=0.5, epochs=epochs, bs=256, random_state=RANDOM_SEED)
+        scores = sgd_decision_function(x_va, w_s, b_s)
 
-    default_f1 = calculate_macro_f1(y_val_text, (scores >= 0).astype(int))
-    threshold, tuned_f1 = best_threshold(y_val_text, scores, calculate_macro_f1)
-    style_rows.append({
-        "style_weight": weight, "val_macro_f1": default_f1,
-        "best_threshold": threshold, "val_macro_f1_tuned": tuned_f1,
-        "fit_seconds": round(time.time() - t0, 1),
-    })
-    print(f"style_weight={weight:<5} F1={default_f1:.4f}  tuned={tuned_f1:.4f}")
+        default_f1 = calculate_macro_f1(y_val_text, (scores >= 0).astype(int))
+        threshold, tuned_f1 = best_threshold(y_val_text, scores, calculate_macro_f1)
+        style_rows.append({
+            "style_weight": weight, "epochs": epochs,
+            "val_macro_f1": default_f1, "best_threshold": threshold,
+            "val_macro_f1_tuned": tuned_f1, "fit_seconds": round(time.time() - t0, 1),
+        })
+        print(f"style_weight={weight:<5} epochs={epochs:<4} "
+              f"F1={default_f1:.4f} tuned={tuned_f1:.4f}")
 
 style_results = (pd.DataFrame(style_rows)
-                 .sort_values("val_macro_f1_tuned", ascending=False)
+                 .sort_values("val_macro_f1", ascending=False)
                  .reset_index(drop=True))
 style_results.to_csv(RESULTS_DIR / "task3_final_model_results.csv", index=False)
 style_results
 """)
 
 md("""
-This is the jump: from about 0.75 on the provided features to about 0.83 on our
-own, with the same from-scratch linear SVM doing the learning. The model was
-never the bottleneck — the features were.
+This is the jump: from **0.7446** on the provided features to **0.8491** on our
+own, with the same from-scratch trainer doing the learning. The model was never
+the bottleneck — the features were.
 
-The stylometry weight itself barely matters between 0.05 and 0.15, and the
-tuned threshold is worth only a fraction of a point. We also tried averaging
-several random seeds; it changed nothing, because the averaged-SGD update
-already smooths across epochs. We left it out rather than pay three times the
-compute for noise.
+Two smaller observations. Training past 60 epochs stops helping (we checked out
+to 200 epochs: the score sits flat within 0.002), so 60 is the plateau rather
+than the edge of our grid. And the tuned threshold is worth only +0.0007 here,
+unlike Extra Trees where it was worth +0.047 — the margin-based losses put the
+natural cut-off at 0 already.
 """)
 
 md("""
@@ -963,8 +989,18 @@ md("""
 
 code("""
 BEST_STYLE_WEIGHT = float(style_results.iloc[0]["style_weight"])
-BEST_STYLE_THRESHOLD = float(style_results.iloc[0]["best_threshold"])
-print(f"selected style_weight={BEST_STYLE_WEIGHT}, threshold={BEST_STYLE_THRESHOLD:.4f}")
+BEST_EPOCHS = int(style_results.iloc[0]["epochs"])
+
+# A threshold picked on 4000 validation rows can easily be noise, so we only
+# adopt one when it earns more than that noise; otherwise we keep the plain 0.
+THRESHOLD_MARGIN = 0.005
+threshold_gain = (float(style_results.iloc[0]["val_macro_f1_tuned"])
+                  - float(style_results.iloc[0]["val_macro_f1"]))
+BEST_STYLE_THRESHOLD = (float(style_results.iloc[0]["best_threshold"])
+                        if threshold_gain > THRESHOLD_MARGIN else 0.0)
+
+print(f"selected style_weight={BEST_STYLE_WEIGHT}, epochs={BEST_EPOCHS}, "
+      f"threshold={BEST_STYLE_THRESHOLD:.4f} (tuning would gain {threshold_gain:+.4f})")
 
 t0 = time.time()
 final_vectorizer = ScratchHybridTfidf()
@@ -978,10 +1014,11 @@ test_styles = final_scaler.transform(style_matrix(test_raw["text"]))
 x_all = combine(all_tfidf, all_styles, BEST_STYLE_WEIGHT)
 x_test = combine(test_tfidf, test_styles, BEST_STYLE_WEIGHT)
 
-final_model = ScratchAveragedHingeSGD(alpha=1e-4, random_state=RANDOM_SEED)
-final_model.fit(x_all, train_raw[LABEL_COLUMN])
-final_scores = final_model.decision_function(x_test)
-final_preds = (final_scores >= BEST_STYLE_THRESHOLD).astype(int)
+final_w, final_b, _, _ = sgd_fit(x_all, train_raw[LABEL_COLUMN].to_numpy(),
+                                 loss="modified_huber", penalty="l2", alpha=1e-5,
+                                 class_weight="balanced", lr=0.5, epochs=BEST_EPOCHS,
+                                 bs=256, random_state=RANDOM_SEED)
+final_preds = sgd_predict(x_test, final_w, final_b, threshold=BEST_STYLE_THRESHOLD)
 
 create_submission(
     test_ids=test_raw[ID_COLUMN],
@@ -1030,18 +1067,18 @@ summary = pd.DataFrame([
     {"task": 3, "model": "Complement Naive Bayes", "features": "provided 5000 TF-IDF",
      "implementation": "from scratch",
      "val_macro_f1": float(cnb_grid.iloc[0]["val_macro_f1"]), "val_macro_f1_tuned": np.nan},
-    {"task": 3, "model": "Linear SVM by SGD", "features": "provided 5000 TF-IDF",
+    {"task": 3, "model": "Linear classifier by SGD", "features": "provided 5000 TF-IDF",
      "implementation": "from scratch",
      "val_macro_f1": float(sgd_grid["val_macro_f1"].max()), "val_macro_f1_tuned": np.nan},
     {"task": 3, "model": "Extra Trees", "features": "provided 5000 TF-IDF",
      "implementation": "sklearn ensemble (permitted)",
      "val_macro_f1": et_default, "val_macro_f1_tuned": et_tuned},
-    {"task": 3, "model": "Soft vote (SVM + Extra Trees + NB)", "features": "provided 5000 TF-IDF",
+    {"task": 3, "model": "Soft vote (linear + Extra Trees + NB)", "features": "provided 5000 TF-IDF",
      "implementation": "ensemble",
      "val_macro_f1": calculate_macro_f1(y_val, (vote >= 0.5).astype(int)),
      "val_macro_f1_tuned": vote_tuned},
-    {"task": 3, "model": "Hybrid TF-IDF + stylometry + linear SVM", "features": "our own",
-     "implementation": "from scratch",
+    {"task": 3, "model": "Hybrid TF-IDF + stylometry + SGD (modified Huber)",
+     "features": "our own", "implementation": "from scratch",
      "val_macro_f1": float(style_results.iloc[0]["val_macro_f1"]),
      "val_macro_f1_tuned": float(style_results.iloc[0]["val_macro_f1_tuned"])},
 ])
@@ -1055,20 +1092,25 @@ md("""
 ### What we take from this
 
 1. **Features beat models.** Every model on the provided 5000 features lands
-   between 0.67 and 0.76. Swapping in our own word + character TF-IDF and
-   stylometry lifts the *same* from-scratch linear SVM to about 0.83. The
+   between 0.67 and 0.76 — a spread of under 0.09 across families as different
+   as Naive Bayes and random forests. Swapping in our own word + character
+   TF-IDF and stylometry lifted the *same* trainer from 0.7446 to 0.8491. The
    biggest single win came from changing the input, not the algorithm.
-2. **The decision threshold is not a detail.** With a 62.5 / 37.5 class split
-   and Macro F1 as the metric, the default cut-off is the wrong operating
-   point — worth about +0.01 for the linear models and +0.04 for Extra Trees,
-   whose probabilities are poorly calibrated.
-3. **An even `k` hurts KNN.** `n_neighbors=2` forces a tie-break that
-   systematically favours class 0, and that alone costs about 0.09 Macro F1 at
-   2000 components.
-4. **We expect the test score to be lower than validation.** The course brief
-   warns that this sample is under 5% of the original dataset and that test
-   performance will trail training performance. We deliberately stopped tuning
-   rather than chase validation decimals that will not transfer.
+2. **Re-ask settled questions when the inputs change.** We picked modified Huber
+   on the provided features in Section 3.3, then built the hybrid pipeline with
+   hinge loss and never re-tested. Re-testing was worth about +0.02 — more than
+   every other tuning decision in Task 3 combined.
+3. **The decision threshold is not a detail — but it is not always worth
+   taking.** It is worth +0.047 for Extra Trees, whose votes are poorly
+   calibrated, and only +0.0007 for the final model. We adopt it only when the
+   gain clears the noise of a 4000-row split.
+4. **An even `k` hurts KNN.** `n_neighbors=2` forces a tie-break that
+   systematically favours class 0, costing about 0.09 Macro F1 at 2000
+   components — a larger effect than the component count itself.
+5. **We expect the test score to trail validation.** The brief warns this sample
+   is under 5% of the original dataset. We stopped tuning rather than chase
+   validation decimals that will not transfer, and we removed an earlier
+   submission that forced the test-set class balance to a fixed quantile.
 """)
 
 notebook = nbf.v4.new_notebook(cells=cells)

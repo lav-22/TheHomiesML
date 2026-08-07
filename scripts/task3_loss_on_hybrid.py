@@ -103,3 +103,36 @@ results.to_csv(RESULTS_DIR / "task3_loss_on_hybrid.csv", index=False)
 
 print("\n=== Loss comparison on the hybrid features ===")
 print(results.to_string(index=False))
+
+
+# ---------------------------------------------------------------------------
+# Refinement: modified Huber won the first pass by a clear margin, so check the
+# win holds across a small grid rather than resting on one lucky setting.
+# ---------------------------------------------------------------------------
+print("\n=== Refining modified Huber ===")
+refine_rows = []
+for lr in [0.3, 0.5, 1.0]:
+    for epochs in [30, 60]:
+        for alpha in [1e-5, 1e-4]:
+            t0 = time.time()
+            w, b, _, _ = sgd_fit(x_train, y_train, loss="modified_huber",
+                                 penalty="l2", alpha=alpha, class_weight="balanced",
+                                 lr=lr, epochs=epochs, bs=256,
+                                 random_state=RANDOM_SEED)
+            scores = sgd_decision_function(x_val, w, b)
+            default_f1 = calculate_macro_f1(y_val, (scores >= 0).astype(int))
+            threshold, tuned_f1 = best_threshold(y_val, scores, calculate_macro_f1)
+            refine_rows.append({
+                "lr": lr, "epochs": epochs, "alpha": alpha,
+                "val_macro_f1": default_f1, "best_threshold": threshold,
+                "val_macro_f1_tuned": tuned_f1,
+                "fit_seconds": round(time.time() - t0, 1),
+            })
+            print(f"lr={lr:<5} epochs={epochs:<4} alpha={alpha:<7} "
+                  f"F1={default_f1:.4f} tuned={tuned_f1:.4f}")
+
+refined = (pd.DataFrame(refine_rows)
+           .sort_values("val_macro_f1_tuned", ascending=False)
+           .reset_index(drop=True))
+refined.to_csv(RESULTS_DIR / "task3_modified_huber_refine.csv", index=False)
+print("\n", refined.to_string(index=False), sep="")
