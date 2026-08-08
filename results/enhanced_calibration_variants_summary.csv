@@ -1,0 +1,8 @@
+file,overall_positive_rate,numeric_positive_rate,uuid_positive_rate
+Enhanced_FromScratch_GlobalRank52.5.csv,0.5249321331618803,0.5396,0.4882441220610305
+Enhanced_FromScratch_GlobalRank57.5.csv,0.574939277039577,0.5934,0.5287643821910956
+Enhanced_FromScratch_GlobalRank60.csv,0.5999428489784255,0.6196,0.5507753876938469
+Enhanced_FromScratch_GroupRank_N55_U55.csv,0.5499357051007286,0.55,0.5497748874437218
+Enhanced_FromScratch_GroupRank_N50_U62.5.csv,0.5356479497071011,0.5,0.6248124062031015
+Enhanced_FromScratch_GroupRank_N55_U62.5.csv,0.5713673381911701,0.55,0.6248124062031015
+Enhanced_FromScratch_GroupRank_N60_U62.5.csv,0.6070867266752393,0.6,0.6248124062031015

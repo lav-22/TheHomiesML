@@ -5,13 +5,27 @@
 Given a piece of text, classify whether it is human-authored (0) or
 machine-generated (1). Scored by Macro F1.
 
+Standalone learning algorithms are implemented from scratch. Existing machine-
+learning libraries are used only where the project permits them, including PCA,
+KNN and ensemble models such as Extra Trees and the final library ensemble.
 
-```
-notebooks/TheHomiesML_Final_Submission.ipynb   Tasks 1-3, one notebook
-submissions/                                   the six Kaggle prediction files
-src/                                           helpers the notebook imports
-data/splits/                                   the shared validation split
-```
+## Repository structure
+
+- `notebooks/TheHomiesML_Final_Submission.ipynb` - consolidated Tasks 1–3
+- `notebooks/logistic_regression_from_scratch.ipynb` - Task 1 experiment
+- `data/splits/` - shared fixed train/validation split
+- `scripts/` - scratch models, Extra Trees tuning and ensemble generation
+- `results/` - validation scores and hyperparameter experiments
+- `submissions/` - Kaggle-ready `id,label` prediction files
+- `models/` - saved enhanced scratch and library-ensemble artifacts
+- `src/` - shared evaluation and submission helpers
+- `reports/` - figures and report assets
+- `docs/` - experiment and implementation documentation
+
+See `docs/model_experiments.md` and `docs/task3_model_implementations.md` for
+the retained model settings, implementation notes and result-file locations.
+
+## Core submission files
 
 | Submission file | Task |
 |---|---|
@@ -21,6 +35,11 @@ data/splits/                                   the shared validation split
 | `PCA1000_KNN_Prediction.csv` | 2 |
 | `PCA500_KNN_Prediction.csv` | 2 |
 | `PCA100_KNN_Prediction.csv` | 2 |
+
+Additional experiments in `submissions/` include the Extra Trees ensembles,
+enhanced from-scratch TF-IDF/stylometry SGD variants, and the permitted library
+SVM/stylometry ensemble. Decision-score files support calibration analysis and
+are not direct Kaggle `id,label` uploads.
 
 ## Results
 
@@ -71,4 +90,5 @@ drivers.
 Task 1 and Task 3 models are written out with NumPy — no sklearn estimator
 learns anything. sklearn appears only where the brief permits it: PCA and KNN in
 Task 2, Extra Trees in Task 3 (libraries are allowed for ensemble models), and
-`f1_score` as the metric.
+`f1_score` as the metric. The dedicated library ensemble is retained under the
+agreed ensemble exception.

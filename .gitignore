@@ -3,10 +3,8 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .DS_Store
+data/.DS_Store
 
 # Course data: too large for Git, download from Kaggle into data/
-data/train.csv
-data/test.csv
-data/train_features.csv
-data/test_features.csv
-data/sample_submission.csv
+data/*.csv
+!data/splits/
