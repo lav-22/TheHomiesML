@@ -5,9 +5,6 @@
 Given a piece of text, classify whether it is human-authored (0) or
 machine-generated (1). Scored by Macro F1.
 
-## What gets submitted
-
-Everything at the top level is a deliverable. Everything else lives in `extra/`.
 
 ```
 notebooks/TheHomiesML_Final_Submission.ipynb   Tasks 1-3, one notebook
@@ -24,9 +21,6 @@ data/splits/                                   the shared validation split
 | `PCA1000_KNN_Prediction.csv` | 2 |
 | `PCA500_KNN_Prediction.csv` | 2 |
 | `PCA100_KNN_Prediction.csv` | 2 |
-
-`extra/` holds the experiment scripts and result tables behind the numbers below
-— useful when writing the report, but not part of the submission.
 
 ## Results
 
