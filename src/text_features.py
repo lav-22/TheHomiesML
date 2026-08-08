@@ -146,9 +146,12 @@ class ScratchTfidfVectorizer:
 class ScratchHybridTfidf:
     """Union of independently normalized word and character TF-IDF."""
 
-    def __init__(self):
-        self.word = ScratchTfidfVectorizer("word", (1, 2), 2, 0.98, 100_000)
-        self.character = ScratchTfidfVectorizer("char_wb", (3, 5), 2, 1.0, 100_000)
+    def __init__(self, min_df=5):
+        # min_df=5 drops terms seen in fewer than five documents. Those are
+        # mostly topic-specific one-offs that do not survive a change of domain,
+        # and cutting them costs nothing on validation.
+        self.word = ScratchTfidfVectorizer("word", (1, 2), min_df, 0.98, 100_000)
+        self.character = ScratchTfidfVectorizer("char_wb", (3, 5), min_df, 1.0, 100_000)
 
     def fit_transform(self, texts):
         texts = list(texts)

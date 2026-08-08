@@ -10,9 +10,9 @@ from sklearn.metrics import f1_score
 from xgboost import XGBClassifier
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
-RESULTS = ROOT / "results"
+RESULTS = ROOT / "extra" / "results"
 SUBMISSION = ROOT / "submissions" / "XGBoost_Prediction.csv"
 SEED = 42
 

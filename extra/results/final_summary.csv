@@ -1,5 +1,5 @@
 task,model,features,implementation,val_macro_f1,val_macro_f1_tuned
-3,Hybrid TF-IDF + stylometry + SGD (modified Huber),our own,from scratch,0.8490549819848693,0.8497904045297762
+3,Hybrid TF-IDF + stylometry + SGD (modified Huber),our own,from scratch,0.8513296848798947,
 3,Linear classifier by SGD,provided 5000 TF-IDF,from scratch,0.7445618537429517,
 3,Soft vote (linear + Extra Trees + NB),provided 5000 TF-IDF,ensemble,0.7270614919434673,0.7462042953533619
 1,Logistic Regression,provided 5000 TF-IDF,from scratch,0.722654648176881,0.7439638198170828

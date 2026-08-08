@@ -12,6 +12,11 @@ labels:
 1. `style_weight`, which scales the stylometry block against the TF-IDF block,
 2. the number of epochs.
 
+`style_weight` is chosen on the cluster-holdout score from
+task3_shift_validation.py rather than on the random split, because the random
+split cannot see the domain shift that separates our validation score from the
+leaderboard.
+
 The loss is modified Huber. We originally used hinge here and only later
 re-tested the loss on these features, which turned out to be worth about +0.02
 Macro F1 — see scripts/task3_loss_on_hybrid.py.
@@ -28,7 +33,7 @@ import time
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
@@ -43,7 +48,7 @@ from src.text_features import (
 )
 
 DATA = ROOT / "data"
-RESULTS = ROOT / "results"
+RESULTS = ROOT / "extra" / "results"
 SUBMISSIONS = ROOT / "submissions"
 
 RANDOM_SEED = 42
@@ -51,8 +56,13 @@ LOSS = "modified_huber"
 LEARNING_RATE = 0.5
 ALPHA = 1e-5
 BATCH_SIZE = 256
-STYLE_WEIGHTS = (0.05, 0.10)
-EPOCH_SETTINGS = (30, 60, 100)
+# Fixed, not re-tuned here. The random split ranks 0.10 and 0.25 as a tie
+# (0.8513 vs 0.8471) but cannot see domain shift; the cluster-holdout in
+# task3_shift_validation.py prefers 0.25 (0.7958 vs 0.7931), which is the
+# regime the leaderboard is in. Both differences are small, so we take the
+# choice that leans on the domain-independent stylometry block.
+STYLE_WEIGHT = 0.25
+EPOCHS = 60          # start of the plateau; flat out to 200 epochs
 
 
 def fit_and_score(x_train, y_train, x_val, y_val, epochs):
@@ -95,46 +105,32 @@ def main():
     val_styles = scaler.transform(style_matrix(val_text))
     print(f"  TF-IDF block: {train_tfidf.shape}, stylometry block: {train_styles.shape}")
 
-    rows = []
-    for weight in STYLE_WEIGHTS:
-        x_train = combine(train_tfidf, train_styles, weight)
-        x_val = combine(val_tfidf, val_styles, weight)
-        for epochs in EPOCH_SETTINGS:
-            result = fit_and_score(x_train, y_train, x_val, y_val, epochs)
-            result["style_weight"] = weight
-            rows.append(result)
-            print(f"style_weight={weight:<5} epochs={epochs:<4} "
-                  f"F1={result['val_macro_f1']:.4f} tuned={result['val_macro_f1_tuned']:.4f}")
-
-    # Select on the *untuned* score. A threshold picked on 4000 validation rows
-    # carries real overfitting risk, so we only adopt one when it earns more
-    # than the noise of that split — otherwise we keep the plain cut-off of 0.
-    THRESHOLD_MARGIN = 0.005
-
-    results = (pd.DataFrame(rows)
-               .sort_values("val_macro_f1", ascending=False)
-               .reset_index(drop=True))
+    # One configuration, reported rather than selected: the choice was already
+    # made on the cluster-holdout score, so there is nothing to tune here.
+    result = fit_and_score(combine(train_tfidf, train_styles, STYLE_WEIGHT), y_train,
+                           combine(val_tfidf, val_styles, STYLE_WEIGHT), y_val, EPOCHS)
+    result["style_weight"] = STYLE_WEIGHT
+    results = pd.DataFrame([result])
     results.to_csv(RESULTS / "task3_final_model_results.csv", index=False)
     print("\n", results.to_string(index=False), sep="")
 
-    best = results.iloc[0]
-    best_weight = float(best["style_weight"])
-    best_epochs = int(best["epochs"])
+    best_weight, best_epochs = STYLE_WEIGHT, EPOCHS
 
-    threshold_gain = float(best["val_macro_f1_tuned"]) - float(best["val_macro_f1"])
+    # A threshold fitted to 4000 validation rows is as likely to be noise as
+    # signal, so it is only adopted when it clears that noise.
+    THRESHOLD_MARGIN = 0.005
+    threshold_gain = result["val_macro_f1_tuned"] - result["val_macro_f1"]
     if threshold_gain > THRESHOLD_MARGIN:
-        best_threshold_value = float(best["best_threshold"])
-        selected_f1 = float(best["val_macro_f1_tuned"])
+        best_threshold_value = result["best_threshold"]
         print(f"\nTuned threshold adopted: it gains {threshold_gain:+.4f}")
     else:
         best_threshold_value = 0.0
-        selected_f1 = float(best["val_macro_f1"])
         print(f"\nTuned threshold rejected: it only gains {threshold_gain:+.4f}, "
               f"which is inside the noise of a 4000-row split")
 
-    print(f"Selected style_weight={best_weight}, epochs={best_epochs}, "
+    print(f"style_weight={best_weight}, epochs={best_epochs}, "
           f"threshold={best_threshold_value:.4f}, "
-          f"validation Macro F1={selected_f1:.6f}")
+          f"random-split Macro F1={result['val_macro_f1']:.6f}")
 
     # Refit on all 20000 labelled rows with the chosen settings
     print("\nRefitting on the full training set...")

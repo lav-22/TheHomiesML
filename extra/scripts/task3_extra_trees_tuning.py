@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import ExtraTreesClassifier
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
@@ -26,7 +26,7 @@ from src.evaluation import calculate_macro_f1
 from src.scratch_models import best_threshold
 
 DATA_DIR = PROJECT_ROOT / "data"
-RESULTS_DIR = PROJECT_ROOT / "results"
+RESULTS_DIR = PROJECT_ROOT / "extra" / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 RANDOM_SEED = 42

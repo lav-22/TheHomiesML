@@ -20,7 +20,7 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
@@ -28,9 +28,9 @@ from src.evaluation import calculate_macro_f1
 from src.submission import create_submission
 
 DATA_DIR = PROJECT_ROOT / "data"
-RESULTS_DIR = PROJECT_ROOT / "results"
+RESULTS_DIR = PROJECT_ROOT / "extra" / "results"
 SUBMISSIONS_DIR = PROJECT_ROOT / "submissions"
-FIGURES_DIR = PROJECT_ROOT / "reports" / "figures"
+FIGURES_DIR = PROJECT_ROOT / "extra" / "figures"
 
 for directory in (RESULTS_DIR, SUBMISSIONS_DIR, FIGURES_DIR):
     directory.mkdir(parents=True, exist_ok=True)

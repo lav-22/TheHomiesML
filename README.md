@@ -5,15 +5,28 @@
 Given a piece of text, classify whether it is human-authored (0) or
 machine-generated (1). Scored by Macro F1.
 
-## Deliverables
+## What gets submitted
 
-| Deliverable | Location |
+Everything at the top level is a deliverable. Everything else lives in `extra/`.
+
+```
+notebooks/TheHomiesML_Final_Submission.ipynb   Tasks 1-3, one notebook
+submissions/                                   the six Kaggle prediction files
+src/                                           helpers the notebook imports
+data/splits/                                   the shared validation split
+```
+
+| Submission file | Task |
 |---|---|
-| Notebook, Tasks 1–3 | `notebooks/TheHomiesML_Final_Submission.ipynb` |
-| Final Kaggle prediction | `submissions/Final_Prediction.csv` |
-| Report | `reports/final_report.md` |
-| Task 1 prediction | `submissions/LogReg_Prediction.csv` |
-| Task 2 predictions | `submissions/PCA{2000,1000,500,100}_KNN_Prediction.csv` |
+| `Final_Prediction.csv` | 3 — the leaderboard entry |
+| `LogReg_Prediction.csv` | 1 |
+| `PCA2000_KNN_Prediction.csv` | 2 |
+| `PCA1000_KNN_Prediction.csv` | 2 |
+| `PCA500_KNN_Prediction.csv` | 2 |
+| `PCA100_KNN_Prediction.csv` | 2 |
+
+`extra/` holds the experiment scripts and result tables behind the numbers below
+— useful when writing the report, but not part of the submission.
 
 ## Results
 
@@ -45,13 +58,23 @@ pip install numpy pandas scipy scikit-learn matplotlib nbformat nbconvert ipyker
 ```
 
 Download `train.csv`, `test.csv`, `train_features.csv`, `test_features.csv` and
-`sample_submission.csv` from Kaggle into `data/`. The two largest are gitignored.
+`sample_submission.csv` from Kaggle into `data/`. They are gitignored for size.
 
 ```bash
-# Regenerate everything
+# Regenerate every submission
 jupyter-nbconvert --to notebook --execute --inplace \
     notebooks/TheHomiesML_Final_Submission.ipynb
+
+# Check the prediction files before uploading
+python3 extra/scripts/verify_submissions.py
 ```
 
-See `docs/model_experiments.md` for the individual experiment scripts and for
-notes on which libraries the task rules permit.
+`random_state=42` throughout. See `extra/scripts/` for the individual experiment
+drivers.
+
+## Rules compliance
+
+Task 1 and Task 3 models are written out with NumPy — no sklearn estimator
+learns anything. sklearn appears only where the brief permits it: PCA and KNN in
+Task 2, Extra Trees in Task 3 (libraries are allowed for ensemble models), and
+`f1_score` as the metric.

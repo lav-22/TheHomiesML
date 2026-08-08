@@ -15,7 +15,7 @@ from pathlib import Path
 
 import nbformat as nbf
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "notebooks" / "TheHomiesML_Final_Submission.ipynb"
 
 SEPARATOR = re.compile(r"^# -{70,}$", re.M)
@@ -135,9 +135,10 @@ from src.evaluation import calculate_macro_f1
 from src.submission import create_submission
 
 DATA_DIR = PROJECT_ROOT / "data"
-RESULTS_DIR = PROJECT_ROOT / "results"
-SUBMISSIONS_DIR = PROJECT_ROOT / "submissions"
-FIGURES_DIR = PROJECT_ROOT / "reports" / "figures"
+SUBMISSIONS_DIR = PROJECT_ROOT / "submissions"      # the graded prediction files
+# Working output. Nothing here is a deliverable, so it is kept out of the way.
+RESULTS_DIR = PROJECT_ROOT / "extra" / "results"
+FIGURES_DIR = PROJECT_ROOT / "extra" / "figures"
 for directory in (RESULTS_DIR, SUBMISSIONS_DIR, FIGURES_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -813,17 +814,29 @@ w_sgd, b_sgd, _, _ = sgd_fit(X_train, y_train, loss=BEST_SGD_LOSS, penalty="l2",
 sgd_scores = sgd_decision_function(X_val, w_sgd, b_sgd)
 
 vote = np.mean([to_rank(sgd_scores), to_rank(et_proba), to_rank(nb_proba)], axis=0)
+
+# Ranks are uniform on [0, 1], so cutting at 0.5 would force exactly half the
+# rows into each class. The class-prior cut-off is the honest default here.
+prior_cutoff = 1.0 - y_train.mean()
 vote_threshold, vote_tuned = best_threshold(y_val, vote, calculate_macro_f1)
 
-print("soft vote, default cut-off:", round(calculate_macro_f1(y_val, (vote >= 0.5).astype(int)), 4))
-print("soft vote, tuned cut-off  :", round(vote_tuned, 4), f"(threshold={vote_threshold:.3f})")
+print("cut at 0.5 (forces a 50/50 split):",
+      round(calculate_macro_f1(y_val, (vote >= 0.5).astype(int)), 4))
+print("cut at the class prior          :",
+      round(calculate_macro_f1(y_val, (vote >= prior_cutoff).astype(int)), 4))
+print("cut tuned on validation         :", round(vote_tuned, 4),
+      f"(threshold={vote_threshold:.3f})")
 """)
 
 md("""
-The vote lands between its members rather than above the best of them. Averaging
-helps when the members are strong *and* make different mistakes; here Naive
-Bayes is much weaker than the other two, so it pulls the average down more than
-its diversity adds back.
+Note how much the cut-off matters for a rank-averaged score: cutting at 0.5
+forces a 50/50 split when the truth is 62.5/37.5, which is why that number looks
+so poor. Judged fairly, the vote still lands *between* its members rather than
+above the best of them. Averaging helps when members are strong and err
+differently; here Naive Bayes is much weaker than the other two, so it drags the
+average down more than its diversity adds back. A negative result, but a clear
+one — and a reminder that an ensemble has to be given a sensible operating point
+before it can be judged.
 """)
 
 md("""
@@ -935,7 +948,7 @@ pd.DataFrame(loss_rows)
 """)
 
 md("""
-### Tuning the stylometry weight and the training length
+### Tuning the stylometry weight
 
 `style_weight` scales the 78 stylometry columns against the ~200,000 TF-IDF
 columns — without it they are simply drowned out.
@@ -943,26 +956,21 @@ columns — without it they are simply drowned out.
 
 code("""
 style_rows = []
-for weight in [0.05, 0.10]:
+for weight in [0.05, 0.10, 0.25, 0.50]:
     x_tr = combine(train_tfidf, train_styles, weight)
     x_va = combine(val_tfidf, val_styles, weight)
 
-    for epochs in [30, 60, 100]:
-        t0 = time.time()
-        w_s, b_s, _, _ = sgd_fit(x_tr, y_train_text, loss="modified_huber",
-                                 penalty="l2", alpha=1e-5, class_weight="balanced",
-                                 lr=0.5, epochs=epochs, bs=256, random_state=RANDOM_SEED)
-        scores = sgd_decision_function(x_va, w_s, b_s)
-
-        default_f1 = calculate_macro_f1(y_val_text, (scores >= 0).astype(int))
-        threshold, tuned_f1 = best_threshold(y_val_text, scores, calculate_macro_f1)
-        style_rows.append({
-            "style_weight": weight, "epochs": epochs,
-            "val_macro_f1": default_f1, "best_threshold": threshold,
-            "val_macro_f1_tuned": tuned_f1, "fit_seconds": round(time.time() - t0, 1),
-        })
-        print(f"style_weight={weight:<5} epochs={epochs:<4} "
-              f"F1={default_f1:.4f} tuned={tuned_f1:.4f}")
+    t0 = time.time()
+    w_s, b_s, _, _ = sgd_fit(x_tr, y_train_text, loss="modified_huber",
+                             penalty="l2", alpha=1e-5, class_weight="balanced",
+                             lr=0.5, epochs=60, bs=256, random_state=RANDOM_SEED)
+    scores = sgd_decision_function(x_va, w_s, b_s)
+    style_rows.append({
+        "style_weight": weight,
+        "val_macro_f1": calculate_macro_f1(y_val_text, (scores >= 0).astype(int)),
+        "fit_seconds": round(time.time() - t0, 1),
+    })
+    print(f"style_weight={weight:<5} F1={style_rows[-1]['val_macro_f1']:.4f}")
 
 style_results = (pd.DataFrame(style_rows)
                  .sort_values("val_macro_f1", ascending=False)
@@ -972,15 +980,91 @@ style_results
 """)
 
 md("""
-This is the jump: from **0.7446** on the provided features to **0.8491** on our
-own, with the same from-scratch trainer doing the learning. The model was never
-the bottleneck — the features were.
+This is the jump: from **0.7446** on the provided features to about **0.85** on
+our own, with the same from-scratch trainer doing the learning. The model was
+never the bottleneck — the features were.
 
-Two smaller observations. Training past 60 epochs stops helping (we checked out
-to 200 epochs: the score sits flat within 0.002), so 60 is the plateau rather
-than the edge of our grid. And the tuned threshold is worth only +0.0007 here,
-unlike Extra Trees where it was worth +0.047 — the margin-based losses put the
-natural cut-off at 0 already.
+Between 0.05 and 0.25 the weight barely matters. We come back to that choice in
+Section 3.7, where a harder validation splits the tie.
+""")
+
+md("""
+## 3.7 Why our validation score is optimistic
+
+Our random 80/20 split scores this model at about 0.85, but the Kaggle public
+leaderboard gives **0.799**. The split is not wrong — it is blind to the thing
+that costs those points. The test set draws on generators and domains the
+training rows do not cover, and a random split puts the same domains on *both*
+sides of the line, so the model is never asked to generalise across a domain.
+
+To measure that, we build a harder validation: cluster the training rows into
+five topic groups, then hold out one whole cluster at a time. Holding out a
+cluster shifts the topic mix *and* the class balance, which is much closer to
+what the test set does to us.
+""")
+
+code("""
+from sklearn.cluster import KMeans
+
+# k-means on the raw 5000-dimensional L2-normalised rows collapses almost
+# everything into a single cluster, so we reduce to 100 components first
+reduced = PCA(n_components=100, random_state=RANDOM_SEED).fit_transform(X_all)
+clusters = KMeans(n_clusters=5, random_state=RANDOM_SEED, n_init=10).fit_predict(reduced)
+
+print("cluster sizes:", np.bincount(clusters))
+print("class-1 rate per cluster:",
+      [round(float(y_all[clusters == g].mean()), 3) for g in range(5)])
+""")
+
+code("""
+shift_rows = []
+for held_out in range(5):
+    tr, va = clusters != held_out, clusters == held_out
+    t0 = time.time()
+
+    fold_vec = ScratchHybridTfidf()
+    tfidf_tr = fold_vec.fit_transform(train_raw.loc[tr, "text"])
+    tfidf_va = fold_vec.transform(train_raw.loc[va, "text"])
+    fold_scaler = ScratchStandardScaler()
+    styles_tr = fold_scaler.fit_transform(style_matrix(train_raw.loc[tr, "text"]))
+    styles_va = fold_scaler.transform(style_matrix(train_raw.loc[va, "text"]))
+
+    for weight in [0.10, 0.25]:
+        w_f, b_f, _, _ = sgd_fit(combine(tfidf_tr, styles_tr, weight), y_all[tr],
+                                 loss="modified_huber", penalty="l2", alpha=1e-5,
+                                 class_weight="balanced", lr=0.5, epochs=60,
+                                 bs=256, random_state=RANDOM_SEED)
+        scores = sgd_decision_function(combine(tfidf_va, styles_va, weight), w_f, b_f)
+        shift_rows.append({
+            "held_out_cluster": held_out, "n_val": int(va.sum()),
+            "style_weight": weight,
+            "macro_f1": calculate_macro_f1(y_all[va], (scores >= 0).astype(int)),
+        })
+    print(f"cluster {held_out} (n={va.sum():>5}) "
+          + "  ".join(f"sw{r['style_weight']}={r['macro_f1']:.4f}"
+                      for r in shift_rows[-2:]) + f"  [{time.time()-t0:.0f}s]")
+
+shift_results = pd.DataFrame(shift_rows)
+shift_results.to_csv(RESULTS_DIR / "task3_shift_validation.csv", index=False)
+display(shift_results.groupby("style_weight")["macro_f1"].mean().round(4).to_frame("mean_macro_f1"))
+""")
+
+md("""
+Two things come out of this.
+
+**Our validation score was never going to hold up.** The cluster-holdout mean
+lands near 0.80, within a few thousandths of the 0.799 the leaderboard actually
+gave us, while the random split said 0.85. The five-point gap is domain shift,
+not a bug, and the brief warned us to expect it: this sample is under 5% of the
+original dataset.
+
+**It splits the tie on `style_weight`.** The random split marginally prefers
+0.10; under domain shift 0.25 is ahead. That is the direction we would expect —
+the stylometry block measures *how* a text is written, which travels across
+domains, while TF-IDF counts *what* it is about, which does not. Both gaps are
+small, so we take the setting that leans on the transferable half.
+
+This is the validation we would use from the start if we did this again.
 """)
 
 md("""
@@ -988,19 +1072,10 @@ md("""
 """)
 
 code("""
-BEST_STYLE_WEIGHT = float(style_results.iloc[0]["style_weight"])
-BEST_EPOCHS = int(style_results.iloc[0]["epochs"])
-
-# A threshold picked on 4000 validation rows can easily be noise, so we only
-# adopt one when it earns more than that noise; otherwise we keep the plain 0.
-THRESHOLD_MARGIN = 0.005
-threshold_gain = (float(style_results.iloc[0]["val_macro_f1_tuned"])
-                  - float(style_results.iloc[0]["val_macro_f1"]))
-BEST_STYLE_THRESHOLD = (float(style_results.iloc[0]["best_threshold"])
-                        if threshold_gain > THRESHOLD_MARGIN else 0.0)
-
-print(f"selected style_weight={BEST_STYLE_WEIGHT}, epochs={BEST_EPOCHS}, "
-      f"threshold={BEST_STYLE_THRESHOLD:.4f} (tuning would gain {threshold_gain:+.4f})")
+# Fixed from Section 3.7 rather than re-selected on the random split, which
+# cannot see the shift the leaderboard puts us under.
+BEST_STYLE_WEIGHT = 0.25
+BEST_EPOCHS = 60
 
 t0 = time.time()
 final_vectorizer = ScratchHybridTfidf()
@@ -1018,7 +1093,10 @@ final_w, final_b, _, _ = sgd_fit(x_all, train_raw[LABEL_COLUMN].to_numpy(),
                                  loss="modified_huber", penalty="l2", alpha=1e-5,
                                  class_weight="balanced", lr=0.5, epochs=BEST_EPOCHS,
                                  bs=256, random_state=RANDOM_SEED)
-final_preds = sgd_predict(x_test, final_w, final_b, threshold=BEST_STYLE_THRESHOLD)
+
+# Threshold left at 0: tuning it on 4000 validation rows gains under 0.002,
+# which is inside the noise of that split.
+final_preds = sgd_predict(x_test, final_w, final_b, threshold=0.0)
 
 create_submission(
     test_ids=test_raw[ID_COLUMN],
@@ -1028,7 +1106,7 @@ create_submission(
     label_column=LABEL_COLUMN,
 )
 print(f"Final_Prediction.csv saved; class-1 rate={final_preds.mean():.4f}"
-      f"  [{time.time()-t0:.0f}s]")
+      f" (training rate {train_raw[LABEL_COLUMN].mean():.4f})  [{time.time()-t0:.0f}s]")
 """)
 
 code("""
@@ -1079,12 +1157,16 @@ summary = pd.DataFrame([
      "val_macro_f1_tuned": vote_tuned},
     {"task": 3, "model": "Hybrid TF-IDF + stylometry + SGD (modified Huber)",
      "features": "our own", "implementation": "from scratch",
-     "val_macro_f1": float(style_results.iloc[0]["val_macro_f1"]),
-     "val_macro_f1_tuned": float(style_results.iloc[0]["val_macro_f1_tuned"])},
+     "val_macro_f1": float(style_results["val_macro_f1"].max()),
+     "val_macro_f1_tuned": np.nan},
 ])
 
 summary = summary.sort_values("val_macro_f1", ascending=False).reset_index(drop=True)
 summary.to_csv(RESULTS_DIR / "final_summary.csv", index=False)
+
+print("Random-split validation, for ranking models against each other.")
+print("Section 3.7 shows why the top row does not transfer to the leaderboard "
+      "one for one.")
 summary.round(4)
 """)
 

@@ -1,4 +1,0 @@
-loss,val_macro_f1,fit_seconds
-hinge,0.8271959641292603,5.4
-modified_huber,0.8490549819848693,5.4
-log_loss,0.8068036283525024,5.4
