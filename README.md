@@ -15,7 +15,7 @@ data/splits/                                   the shared validation split
 
 | Submission file | Task |
 |---|---|
-| `Final_Prediction.csv` | 3 — the leaderboard entry |
+| `Final_Prediction.csv` | 3 |
 | `LogReg_Prediction.csv` | 1 |
 | `PCA2000_KNN_Prediction.csv` | 2 |
 | `PCA1000_KNN_Prediction.csv` | 2 |
