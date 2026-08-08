@@ -1,7 +1,21 @@
 """From-scratch word/character TF-IDF, stylometry, and averaged SGD.
 
-The learning pipeline in this file deliberately does not use scikit-learn.
-NumPy and SciPy are used only for numerical arrays and sparse-matrix storage.
+How the model works
+-------------------
+1. Word n-grams capture phrases, while character n-grams capture spelling,
+   punctuation and formatting habits that may distinguish writing sources.
+2. TF-IDF makes a term important when it is frequent in one document but
+   uncommon across the training collection. Each document vector is L2
+   normalized so long documents do not automatically receive larger scores.
+3. Stylometric measurements describe writing *style* (sentence length,
+   punctuation, function-word usage, vocabulary diversity, and similar cues).
+4. A linear classifier learns one weight per feature. Positive weighted sums
+   favour class 1 and negative sums favour class 0.
+5. Mini-batch SGD minimizes balanced hinge loss with L2 regularization. Model
+   weights from successive epochs are averaged to reduce noisy SGD variation.
+
+The learning pipeline deliberately does not use scikit-learn or SciPy. NumPy
+and pandas are used only for general numerical and tabular data handling.
 """
 
 from collections import Counter
@@ -12,7 +26,6 @@ import time
 
 import numpy as np
 import pandas as pd
-from scipy import sparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,8 +50,92 @@ FUNCTION_WORD_GROUPS = {
 }
 
 
+class ScratchSparseMatrix:
+    """Row-oriented sparse matrix containing only NumPy index/value arrays.
+
+    Text matrices contain hundreds of thousands of possible n-grams, but one
+    document uses only a small fraction of them. Storing just the non-zero
+    column indices and values avoids constructing an enormous dense matrix.
+    """
+
+    def __init__(self, row_indices, row_values, n_columns):
+        if len(row_indices) != len(row_values):
+            raise ValueError("Sparse row indices and values must have equal lengths.")
+        self.row_indices = [np.asarray(row, dtype=np.int32) for row in row_indices]
+        self.row_values = [np.asarray(row, dtype=np.float32) for row in row_values]
+        self.shape = (len(self.row_indices), int(n_columns))
+
+    @classmethod
+    def hstack(cls, matrices):
+        if not matrices:
+            return cls([], [], 0)
+        row_count = matrices[0].shape[0]
+        if any(matrix.shape[0] != row_count for matrix in matrices):
+            raise ValueError("All sparse matrices must have the same row count.")
+        offsets = np.cumsum([0] + [matrix.shape[1] for matrix in matrices[:-1]])
+        indices, values = [], []
+        for row in range(row_count):
+            row_indices = [
+                matrix.row_indices[row] + offset
+                for matrix, offset in zip(matrices, offsets)
+                if matrix.row_indices[row].size
+            ]
+            row_values = [
+                matrix.row_values[row]
+                for matrix in matrices
+                if matrix.row_values[row].size
+            ]
+            indices.append(
+                np.concatenate(row_indices) if row_indices else np.empty(0, dtype=np.int32)
+            )
+            values.append(
+                np.concatenate(row_values) if row_values else np.empty(0, dtype=np.float32)
+            )
+        return cls(indices, values, sum(matrix.shape[1] for matrix in matrices))
+
+    def append_dense(self, dense):
+        dense = np.asarray(dense, dtype=np.float32)
+        if dense.ndim != 2 or dense.shape[0] != self.shape[0]:
+            raise ValueError("Dense features must have the same number of rows.")
+        new_indices, new_values = [], []
+        for row, dense_row in enumerate(dense):
+            nonzero = np.flatnonzero(dense_row).astype(np.int32)
+            new_indices.append(
+                np.concatenate([self.row_indices[row], nonzero + self.shape[1]])
+            )
+            new_values.append(
+                np.concatenate([self.row_values[row], dense_row[nonzero]])
+            )
+        return ScratchSparseMatrix(
+            new_indices, new_values, self.shape[1] + dense.shape[1]
+        )
+
+    def dot(self, weights, rows=None):
+        weights = np.asarray(weights, dtype=np.float32)
+        selected = range(self.shape[0]) if rows is None else np.asarray(rows, dtype=int)
+        return np.asarray([
+            np.dot(self.row_values[row], weights[self.row_indices[row]])
+            for row in selected
+        ], dtype=np.float32)
+
+    def transpose_dot(self, rows, coefficients):
+        gradient = np.zeros(self.shape[1], dtype=np.float32)
+        for row, coefficient in zip(np.asarray(rows, dtype=int), coefficients):
+            np.add.at(
+                gradient,
+                self.row_indices[row],
+                self.row_values[row] * np.float32(coefficient),
+            )
+        return gradient
+
+
 class ScratchStandardScaler:
-    """Column-wise standardization implemented with NumPy."""
+    """Column-wise standardization implemented with NumPy.
+
+    For each stylometric column this computes z = (x - mean) / standard
+    deviation. This prevents a count with a large numerical range from
+    dominating a rate or ratio simply because of its units.
+    """
 
     def fit(self, values):
         values = np.asarray(values, dtype=np.float64)
@@ -56,7 +153,14 @@ class ScratchStandardScaler:
 
 
 class ScratchTfidfVectorizer:
-    """Small TF-IDF vectorizer supporting the settings used by this project."""
+    """Small TF-IDF vectorizer supporting the settings used by this project.
+
+    ``fit`` learns the vocabulary and smoothed inverse-document frequencies:
+        idf(t) = log((1 + N) / (1 + df(t))) + 1
+    ``transform`` uses sublinear term frequency ``1 + log(count)`` and then
+    L2-normalizes every document. The vocabulary is learned on training text
+    only, which prevents validation/test information leaking into training.
+    """
 
     def __init__(self, analyzer, ngram_range, min_df=2, max_df=1.0,
                  max_features=100_000):
@@ -116,14 +220,16 @@ class ScratchTfidfVectorizer:
 
     def transform(self, texts):
         texts = list(texts)
-        rows, columns, values = [], [], []
-        for row, text in enumerate(texts):
+        row_indices, row_values = [], []
+        for text in texts:
             counts = Counter(
                 self.vocabulary_[term]
                 for term in self._terms(text)
                 if term in self.vocabulary_
             )
             if not counts:
+                row_indices.append(np.empty(0, dtype=np.int32))
+                row_values.append(np.empty(0, dtype=np.float32))
                 continue
             indices = np.fromiter(counts.keys(), dtype=np.int32)
             data = 1.0 + np.log(np.fromiter(counts.values(), dtype=np.float32))
@@ -131,14 +237,9 @@ class ScratchTfidfVectorizer:
             norm = float(np.linalg.norm(data))
             if norm:
                 data /= norm
-            rows.extend([row] * len(indices))
-            columns.extend(indices.tolist())
-            values.extend(data.tolist())
-        return sparse.csr_matrix(
-            (values, (rows, columns)),
-            shape=(len(texts), len(self.vocabulary_)),
-            dtype=np.float32,
-        )
+            row_indices.append(indices)
+            row_values.append(data.astype(np.float32))
+        return ScratchSparseMatrix(row_indices, row_values, len(self.vocabulary_))
 
     def fit_transform(self, texts):
         texts = list(texts)
@@ -154,21 +255,26 @@ class ScratchHybridTfidf:
 
     def fit_transform(self, texts):
         texts = list(texts)
-        return sparse.hstack(
-            [self.word.fit_transform(texts), self.character.fit_transform(texts)],
-            format="csr",
-        )
+        return ScratchSparseMatrix.hstack([
+            self.word.fit_transform(texts), self.character.fit_transform(texts)
+        ])
 
     def transform(self, texts):
         texts = list(texts)
-        return sparse.hstack(
-            [self.word.transform(texts), self.character.transform(texts)],
-            format="csr",
-        )
+        return ScratchSparseMatrix.hstack([
+            self.word.transform(texts), self.character.transform(texts)
+        ])
 
 
 class ScratchAveragedHingeSGD:
-    """Mini-batch SGD for a balanced, L2-regularized linear SVM."""
+    """Mini-batch SGD for a balanced, L2-regularized linear SVM.
+
+    With labels converted to -1/+1, hinge loss is max(0, 1 - y*f(x)). A sample
+    updates the separating hyperplane only when its margin y*f(x) is below 1.
+    Inverse-frequency class weights give both classes equal total influence.
+    L2 shrinkage discourages extreme coefficients, and the learning rate
+    decays with the number of updates for increasingly stable steps.
+    """
 
     def __init__(self, alpha=1e-4, epochs=100, batch_size=256,
                  learning_rate=20.0, random_state=42, tolerance=1e-5):
@@ -180,7 +286,8 @@ class ScratchAveragedHingeSGD:
         self.tolerance = tolerance
 
     def fit(self, features, labels):
-        features = sparse.csr_matrix(features, dtype=np.float32)
+        if not isinstance(features, ScratchSparseMatrix):
+            raise TypeError("features must be a ScratchSparseMatrix")
         labels = np.asarray(labels, dtype=np.int8)
         signed = np.where(labels == 1, 1.0, -1.0).astype(np.float32)
         counts = np.bincount(labels, minlength=2)
@@ -200,17 +307,15 @@ class ScratchAveragedHingeSGD:
             epoch_hinge = 0.0
             for start in range(0, len(labels), self.batch_size):
                 indices = order[start:start + self.batch_size]
-                batch = features[indices]
                 targets = signed[indices]
                 importance = sample_weights[indices]
-                margins = targets * (batch.dot(weights) + bias)
+                margins = targets * (features.dot(weights, indices) + bias)
                 active = margins < 1.0
                 rate = self.learning_rate / math.sqrt(1.0 + update)
                 weights *= max(0.0, 1.0 - rate * self.alpha)
                 if np.any(active):
-                    active_x = batch[active]
                     coefficients = importance[active] * targets[active]
-                    gradient = np.asarray(active_x.T.dot(coefficients)).ravel()
+                    gradient = features.transpose_dot(indices[active], coefficients)
                     weights += (rate / len(indices)) * gradient
                     bias += rate * float(coefficients.sum() / len(indices))
                 epoch_hinge += float(np.maximum(0.0, 1.0 - margins).sum())
@@ -381,9 +486,7 @@ def style_matrix(texts):
 
 
 def combine(tfidf, styles, weight):
-    return sparse.hstack(
-        [tfidf, sparse.csr_matrix(styles * weight)], format="csr"
-    )
+    return tfidf.append_dense(styles * weight)
 
 
 def save_submission(filename, ids, predictions):

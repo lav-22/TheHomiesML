@@ -1,0 +1,4 @@
+model,type,validation_macro_f1
+SVM + stylometry gradient boosting,ensemble,0.8901039984273136
+HistGradientBoosting_stylometry,individual,0.8576993446865449
+LinearSVC_C1,individual,0.8567069931237572

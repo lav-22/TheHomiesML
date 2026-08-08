@@ -1,7 +1,20 @@
 """Member 5 Extra Trees tuning and validation ensembles.
 
-This script deliberately uses a small, assignment-driven search rather than a
-large hyperparameter grid. Model selection uses validation Macro F1 only.
+Model explanation
+-----------------
+Extra Trees is itself an ensemble: many decision trees are trained with extra
+randomness in their candidate splits, then their class probabilities are
+averaged. Individual trees can overfit, but averaging many differently shaped
+trees reduces variance. ``n_estimators`` controls the number of trees,
+``max_depth`` limits tree complexity, ``max_features`` controls how many
+features may be considered at a split, and ``class_weight`` changes the cost
+assigned to each class.
+
+The second stage combines Extra Trees with Logistic Regression and a Linear
+SVM. Weighted soft voting is useful because the models make decisions in
+different ways: trees model nonlinear feature interactions, whereas logistic
+regression and the SVM learn linear boundaries. Model selection uses the fixed
+validation split and Macro F1, which weights both classes equally.
 """
 
 from __future__ import annotations
@@ -30,6 +43,12 @@ def macro_f1(y_true, y_pred) -> float:
 
 
 def load_fixed_split():
+    """Load Member 1's exact split and verify row IDs before selecting rows.
+
+    Matching by the supplied order is essential: even a correct model would
+    produce meaningless validation scores if labels and feature rows shifted.
+    The assertions deliberately fail early if the shared split is inconsistent.
+    """
     split = pd.read_csv(DATA / "splits" / "shared_validation_split.csv")
     header = pd.read_csv(DATA / "train_features.csv", nrows=0).columns
     feature_columns = [c for c in header if c not in {"id", "label"}]
@@ -53,6 +72,7 @@ def load_fixed_split():
 
 
 def run_extra_trees(x_train, x_val, y_train, y_val):
+    """Change one Extra Trees setting at a time and retain the best validation model."""
     rows = []
     fitted = {}
 
@@ -107,8 +127,9 @@ def run_extra_trees(x_train, x_val, y_train, y_val):
         if value == 800:
             tree_models[value] = tree_model
 
-    # All remaining studies hold the baseline settings constant so each table
-    # isolates the requested parameter rather than becoming a grid search.
+    # All remaining studies hold the baseline settings constant. This is a
+    # controlled experiment: a score change can be attributed to the one
+    # hyperparameter that changed rather than an interaction in a large grid.
     for value in (None, 20, 40):
         evaluate("max_depth", **(baseline | {"max_depth": value}))
 
@@ -166,6 +187,12 @@ def train_member4_svm(train_mask, val_mask):
 
 
 def evaluate_ensembles(y_val, scores):
+    """Compare individual models with two- and three-model weighted voting.
+
+    These are soft-voting ensembles: continuous confidence scores are averaged
+    before applying the 0.5 decision threshold. A stronger model receives the
+    larger weight, but equal voting is retained as a fair baseline.
+    """
     individual = []
     for name, score in scores.items():
         # ExtraTrees.predict resolves exact 0.5 vote ties to class 0.
