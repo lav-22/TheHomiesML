@@ -1,0 +1,24 @@
+{
+  "validation_macro_f1": 0.8911714588305113,
+  "threshold": 0.43000000000000005,
+  "weights": {
+    "word": 0.25,
+    "char": 0.3500000000000001,
+    "stylometry": 0.3999999999999999
+  },
+  "word": {
+    "score": 0.8103425677395235,
+    "c": 1.0,
+    "class_weight": "balanced"
+  },
+  "char": {
+    "score": 0.8052736940091269,
+    "c": 0.35,
+    "class_weight": "balanced"
+  },
+  "stylometry_min_samples_leaf": 2,
+  "prediction_counts": {
+    "0": 2045,
+    "1": 4954
+  }
+}
