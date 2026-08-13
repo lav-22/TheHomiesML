@@ -18,7 +18,7 @@ cannot tell apart.
 
 Run from the repository root:
 
-    python3 extra/scripts/task3_shift_validation.py
+    python3 scripts/task3_shift_validation.py
 """
 
 import sys
@@ -31,7 +31,7 @@ from scipy import sparse
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
@@ -45,7 +45,7 @@ from src.text_features import (
 )
 
 DATA_DIR = PROJECT_ROOT / "data"
-RESULTS_DIR = PROJECT_ROOT / "extra" / "results"
+RESULTS_DIR = PROJECT_ROOT / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 RANDOM_SEED = 42

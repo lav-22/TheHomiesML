@@ -35,7 +35,7 @@ from advanced_stylometry_sgd import style_matrix
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 RESULTS = ROOT / "results"
-SUBMISSIONS = ROOT / "submissions"
+SUBMISSIONS = ROOT / "submissions" / "experiments"
 MODELS = ROOT / "models" / "library_ensemble"
 SEED = 42
 

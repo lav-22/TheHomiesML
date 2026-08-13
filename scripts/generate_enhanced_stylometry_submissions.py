@@ -11,7 +11,7 @@ import pandas as pd
 
 PROJECT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
-OUTPUT = PROJECT / "submissions"
+OUTPUT = PROJECT / "submissions" / "experiments"
 MODEL_OUTPUT = PROJECT / "models" / "enhanced_from_scratch"
 sys.path.insert(0, str(PROJECT / "scripts"))
 sys.path.insert(0, str(HERE))

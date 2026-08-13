@@ -31,7 +31,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 RESULTS = ROOT / "results"
-SUBMISSIONS = ROOT / "submissions"
+SUBMISSIONS = ROOT / "submissions" / "experiments"
 
 FUNCTION_WORD_GROUPS = {
     "first_person": {"i", "me", "my", "mine", "we", "us", "our", "ours"},
@@ -494,6 +494,7 @@ def save_submission(filename, ids, predictions):
     assert frame.columns.tolist() == ["id", "label"]
     assert len(frame) == 6_999 and frame["id"].is_unique
     assert not frame.isna().any().any() and set(frame["label"]) <= {0, 1}
+    SUBMISSIONS.mkdir(parents=True, exist_ok=True)
     path = SUBMISSIONS / filename
     frame.to_csv(path, index=False)
     print(f"Saved {path}; class-1 rate={frame['label'].mean():.4f}")

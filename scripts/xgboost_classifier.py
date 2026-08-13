@@ -10,10 +10,10 @@ from sklearn.metrics import f1_score
 from xgboost import XGBClassifier
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-RESULTS = ROOT / "extra" / "results"
-SUBMISSION = ROOT / "submissions" / "XGBoost_Prediction.csv"
+RESULTS = ROOT / "results"
+SUBMISSION = ROOT / "submissions" / "experiments" / "XGBoost_Prediction.csv"
 SEED = 42
 
 
@@ -59,6 +59,7 @@ def make_model(params, early_stopping_rounds=None):
 
 def main():
     RESULTS.mkdir(parents=True, exist_ok=True)
+    SUBMISSION.parent.mkdir(parents=True, exist_ok=True)
     x_all, y_all, x_test, test_ids, train_mask, val_mask = load_data()
     x_train, y_train = x_all[train_mask], y_all[train_mask]
     x_val, y_val = x_all[val_mask], y_all[val_mask]

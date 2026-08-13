@@ -38,7 +38,10 @@ The first command refits the enhanced scratch model, creates decision scores
 and base submissions, and saves the fitted artifact to
 `models/enhanced_from_scratch/enhanced_stylometry_sgd.pkl.gz`. The second
 command creates the source-aware rank variants, including
-`submissions/Enhanced_FromScratch_GroupRank_N55_U62.5.csv`.
+`submissions/experiments/Enhanced_FromScratch_GroupRank_N55_U62.5.csv`.
+
+All of these write to `submissions/experiments/`; the six graded prediction
+files in `submissions/` come from the final notebook.
 
 Full experiment tables are stored in:
 

@@ -7,8 +7,8 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INPUT = ROOT / "submissions/Enhanced_Stylometry_FromScratch_DecisionScores.csv"
-OUTPUT = ROOT / "submissions"
+INPUT = ROOT / "submissions" / "experiments" / "Enhanced_Stylometry_FromScratch_DecisionScores.csv"
+OUTPUT = ROOT / "submissions" / "experiments"
 SUMMARY = ROOT / "results" / "enhanced_calibration_variants_summary.csv"
 
 

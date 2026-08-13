@@ -14,7 +14,7 @@ from extra_trees_and_ensembles import SEED, train_member1_logreg
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-OUTPUT = ROOT / "submissions" / "Ensemble2_Prediction.csv"
+OUTPUT = ROOT / "submissions" / "experiments" / "Ensemble2_Prediction.csv"
 
 
 def load_precomputed_features():

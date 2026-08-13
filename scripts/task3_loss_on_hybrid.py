@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
@@ -35,7 +35,7 @@ from src.text_features import (
 )
 
 DATA_DIR = PROJECT_ROOT / "data"
-RESULTS_DIR = PROJECT_ROOT / "extra" / "results"
+RESULTS_DIR = PROJECT_ROOT / "results"
 
 RANDOM_SEED = 42
 STYLE_WEIGHT = 0.10          # selected in task3_final_model.py

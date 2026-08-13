@@ -33,7 +33,7 @@ import time
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
@@ -48,7 +48,7 @@ from src.text_features import (
 )
 
 DATA = ROOT / "data"
-RESULTS = ROOT / "extra" / "results"
+RESULTS = ROOT / "results"
 SUBMISSIONS = ROOT / "submissions"
 
 RANDOM_SEED = 42

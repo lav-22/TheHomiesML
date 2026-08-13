@@ -1,14 +1,23 @@
 # Scratch model experiments
 
-This branch contains only model pipelines whose learning algorithms are
-implemented directly in the project. NumPy and pandas are used for numerical
-and data operations; no sklearn, SciPy or XGBoost estimators are used.
+Model pipelines whose learning algorithms are implemented directly in the
+project. NumPy and pandas are used for numerical and data operations; no
+sklearn, SciPy or XGBoost estimators are used.
+
+These are the supporting experiments. The graded implementations and the six
+graded prediction files are all in `notebooks/TheHomiesML_Final_Submission.ipynb`.
 
 ## Logistic regression
 
-`notebooks/logistic_regression_from_scratch.ipynb` implements sigmoid, log
-loss, gradients, mini-batch training, prediction and Macro F1 directly. Its
-Kaggle output is `submissions/LogReg_Prediction.csv`.
+Task 1 is implemented in Section 1 of
+`notebooks/TheHomiesML_Final_Submission.ipynb`, which defines sigmoid, log loss,
+gradients, mini-batch training and prediction directly and writes the graded
+`submissions/LogReg_Prediction.csv`.
+
+`archive/logistic_regression_from_scratch.ipynb` is the earlier working notebook
+for the same task, kept for the record. It runs a plain learning-rate / epoch /
+batch-size grid without the L2, shuffling and threshold search that the final
+version adds, and writes only to `submissions/experiments/`.
 
 ## Advanced stylometry TF-IDF SGD
 
@@ -57,7 +66,7 @@ python3 scripts/library_ensemble.py
 It validates the two constituent models and their equal-weight rank ensemble,
 refits on all labelled data, saves trained artifacts under
 `models/library_ensemble/`, and writes its Kaggle submissions to
-`submissions/`.
+`submissions/experiments/`.
 
 See `docs/task3_model_implementations.md` for the complete Task 3 model list,
 implementation locations, key hyperparameters and validation results.
