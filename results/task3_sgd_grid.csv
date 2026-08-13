@@ -1,7 +1,7 @@
 setting,val_macro_f1,fit_seconds
-loss=hinge,0.6995258606085382,7.1
-loss=modified_huber,0.7445618537429517,7.0
-loss=log_loss,0.696270875672869,7.0
-"modified_huber, alpha=1e-05",0.7417033392761034,7.0
-"modified_huber, alpha=0.0001",0.7445618537429517,7.3
-"modified_huber, alpha=0.001",0.7395184518748477,7.9
+loss=hinge,0.6995258606085382,7.2
+loss=modified_huber,0.7445618537429517,7.3
+loss=log_loss,0.696270875672869,7.2
+"modified_huber, alpha=1e-05",0.7417033392761034,7.1
+"modified_huber, alpha=0.0001",0.7445618537429517,7.1
+"modified_huber, alpha=0.001",0.7395184518748477,7.0
